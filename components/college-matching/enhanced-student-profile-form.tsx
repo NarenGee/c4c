@@ -1,4 +1,6 @@
 "use client"
+
+import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -517,7 +519,8 @@ export function EnhancedStudentProfileForm({ onRecommendationsGenerated }: Enhan
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
 
-  const handleGenerateRecommendations = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLoading(true)
     setMessage(null)
 
@@ -1440,7 +1443,7 @@ export function EnhancedStudentProfileForm({ onRecommendationsGenerated }: Enhan
   )
 
   const renderStep5 = () => (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="text-center mb-6">
         <h3 className="text-lg font-semibold">Background Information</h3>
         <p className="text-sm text-muted-foreground">Help us understand your background</p>
@@ -1486,38 +1489,6 @@ export function EnhancedStudentProfileForm({ onRecommendationsGenerated }: Enhan
           />
         </div>
       </div>
-
-      <div className="border-t pt-6">
-        <div className="text-center space-y-4">
-          <div>
-            <h4 className="text-lg font-semibold">Ready to Get Your College Recommendations?</h4>
-            <p className="text-sm text-muted-foreground">
-              Click the button below to generate personalized college recommendations based on your profile
-            </p>
-          </div>
-
-          <Button onClick={handleGenerateRecommendations} disabled={loading} size="lg" className="w-full max-w-md">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating Recommendations...
-              </>
-            ) : (
-              <>
-                <Brain className="mr-2 h-4 w-4" />
-                Get College Recommendations
-              </>
-            )}
-          </Button>
-
-          {message && (
-            <Alert variant={message.type === "error" ? "destructive" : "default"} className="max-w-md mx-auto">
-              <GraduationCap className="h-4 w-4" />
-              <AlertDescription>{message.text}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-      </div>
     </div>
   )
 
@@ -1542,24 +1513,46 @@ export function EnhancedStudentProfileForm({ onRecommendationsGenerated }: Enhan
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {currentStep === 1 && renderStep1()}
           {currentStep === 2 && renderStep2()}
           {currentStep === 3 && renderStep3()}
           {currentStep === 4 && renderStep4()}
           {currentStep === 5 && renderStep5()}
 
-          {currentStep < totalSteps && (
-            <div className="flex justify-between">
-              <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>
-                Previous
-              </Button>
+          {message && (
+            <Alert variant={message.type === "error" ? "destructive" : "default"}>
+              <GraduationCap className="h-4 w-4" />
+              <AlertDescription>{message.text}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-between">
+            <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>
+              Previous
+            </Button>
+
+            {currentStep < totalSteps ? (
               <Button type="button" onClick={handleNext}>
                 Next
               </Button>
-            </div>
-          )}
-        </div>
+            ) : (
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating Recommendations...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="mr-2 h-4 w-4" />
+                    Get College Recommendations
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </form>
       </CardContent>
     </Card>
   )

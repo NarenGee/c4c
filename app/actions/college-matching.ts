@@ -2,265 +2,294 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth"
-import { generateText } from "ai"
+import { generateObject } from "ai"
 import { google } from "@ai-sdk/google"
+import { z } from "zod"
+
+export interface CollegeMatch {
+  id: string
+  student_id: string
+  college_name: string
+  match_score: number
+  justification: string
+  source_links: string[]
+  country?: string
+  city?: string
+  program_type?: string
+  estimated_cost?: string
+  admission_requirements?: string
+  generated_at: string
+  profile_snapshot: any
+}
 
 export interface StudentProfile {
-  test_type?: string
+  // Academic Information
+  test_type?: string // IB, A-Levels, SAT/ACT, etc.
   total_score?: string
   gpa?: number
   sat_score?: number
   act_score?: number
+  ib_score?: number
+  a_level_grades?: string
   hl_subjects?: string[]
   sl_subjects?: string[]
+
+  // Preferences
   intended_major?: string
-  campus_type?: string
-  preferred_class_size?: string
+  campus_type?: string // Urban, Suburban, Rural
   location_preference?: string
   distance_from_home?: string
-  budget_range?: string
   financial_aid_needed?: boolean
-  research_interest?: boolean
+  budget_range?: string
+
+  // Background
   extracurriculars?: string[]
-  interests?: string[]
-  languages?: string[]
   work_experience?: string
   volunteer_work?: string
+  languages?: string[]
   special_circumstances?: string
+
+  // Personal
+  interests?: string[]
   career_goals?: string
+  preferred_class_size?: string
+  research_interest?: boolean
 }
 
-export interface CollegeMatch {
-  id: string
-  user_id: string // ✔ matches DB
-  college_name: string
-  match_percentage: number
-  reasoning: string
-  pros: string[]
-  cons: string[]
-  fit_category: "Safety" | "Target" | "Reach"
-  created_at: string
-}
+const CollegeRecommendationSchema = z.object({
+  recommendations: z.array(
+    z.object({
+      college_name: z.string(),
+      match_score: z.number().min(0).max(1),
+      justification: z.string(),
+      source_links: z.array(z.string()).optional().default([]),
+      country: z.string().optional(),
+      city: z.string().optional(),
+      program_type: z.string().optional(),
+      estimated_cost: z.string().optional(),
+      admission_requirements: z.string().optional(),
+    }),
+  ),
+})
 
-let hasLoggedMissingKey = false
+export async function generateCollegeRecommendations(
+  profileData: StudentProfile,
+): Promise<{ success: boolean; error?: string; matches?: CollegeMatch[] }> {
+  const user = await getCurrentUser()
 
-export async function generateCollegeRecommendations(profile: StudentProfile) {
-  try {
-    // Check if API key is configured
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      if (!hasLoggedMissingKey) {
-        console.warn("GOOGLE_GENERATIVE_AI_API_KEY environment variable is not set")
-        hasLoggedMissingKey = true
-      }
-      return {
-        success: false,
-        error: "Gemini API key not configured. Please contact your administrator.",
-      }
-    }
-
-    const user = await getCurrentUser()
-    if (!user) {
-      return { success: false, error: "User not authenticated" }
-    }
-
-    const supabase = createClient()
-
-    // Create a comprehensive prompt for Gemini
-    const prompt = `
-You are a college admissions counselor AI. Based on the following student profile, recommend 8-10 colleges that would be good fits. For each college, provide:
-
-1. College name
-2. Match percentage (0-100)
-3. Brief reasoning for the match
-4. 3-4 pros (why it's a good fit)
-5. 2-3 cons (potential concerns)
-6. Fit category (Safety/Target/Reach)
-
-Student Profile:
-- Academic Background: ${profile.test_type || "Not specified"} ${profile.total_score ? `(Score: ${profile.total_score})` : ""}
-- GPA: ${profile.gpa || "Not provided"}
-- SAT: ${profile.sat_score || "Not provided"}
-- ACT: ${profile.act_score || "Not provided"}
-- Intended Major: ${profile.intended_major || "Undecided"}
-- Campus Preference: ${profile.campus_type || "No preference"}
-- Location: ${profile.location_preference || "No preference"}
-- Budget Range: ${profile.budget_range || "Not specified"}
-- Financial Aid Needed: ${profile.financial_aid_needed ? "Yes" : "No"}
-- Research Interest: ${profile.research_interest ? "Yes" : "No"}
-- Extracurriculars: ${profile.extracurriculars?.join(", ") || "None listed"}
-- Work Experience: ${profile.work_experience || "None"}
-- Volunteer Work: ${profile.volunteer_work || "None"}
-- Special Circumstances: ${profile.special_circumstances || "None"}
-- Career Goals: ${profile.career_goals || "Not specified"}
-
-Please format your response as a JSON array of objects with the following structure:
-[
-  {
-    "college_name": "University Name",
-    "match_percentage": 85,
-    "reasoning": "Brief explanation of why this is a good match",
-    "pros": ["Pro 1", "Pro 2", "Pro 3"],
-    "cons": ["Con 1", "Con 2"],
-    "fit_category": "Target"
+  if (!user || user.role !== "student") {
+    return { success: false, error: "Only students can generate college recommendations" }
   }
-]
 
-Focus on realistic, well-known colleges and universities. Consider the student's academic profile, preferences, and goals when making recommendations.
-`
+  const supabase = await createClient()
+  const startTime = Date.now()
 
-    // Generate recommendations using Gemini
-    const { text } = await generateText({
-      model: google("gemini-1.5-flash", {
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      }),
+  try {
+    // Construct the Gemini prompt
+    const prompt = constructGeminiPrompt(profileData, user.full_name)
+
+    // Log the prompt
+    const { data: logEntry } = await supabase
+      .from("gemini_logs")
+      .insert({
+        student_id: user.id,
+        prompt_text: prompt,
+        model_used: "gemini-1.5-pro",
+        success: false, // Will update after successful response
+      })
+      .select()
+      .single()
+
+    // Call Gemini API
+    const { object: recommendations } = await generateObject({
+      model: google("gemini-1.5-pro"),
       prompt,
-      maxTokens: 4000,
+      schema: CollegeRecommendationSchema,
     })
 
-    // Log the Gemini interaction
-    await supabase.from("gemini_logs").insert({
-      user_id: user.id,
-      prompt_type: "college_matching",
-      prompt_text: prompt,
-      response_text: text,
-      tokens_used: text.length, // Approximate
-    })
+    const processingTime = Date.now() - startTime
 
-    // Parse the JSON response
-    let recommendations: any[]
-    try {
-      // Extract JSON from the response (in case there's extra text)
-      const jsonMatch = text.match(/\[[\s\S]*\]/)
-      if (!jsonMatch) {
-        throw new Error("No JSON array found in response")
-      }
-      recommendations = JSON.parse(jsonMatch[0])
-    } catch (parseError) {
-      console.error("Failed to parse Gemini response:", parseError)
-      return {
-        success: false,
-        error: "Failed to parse AI recommendations. Please try again.",
-      }
+    // Update log with success
+    if (logEntry) {
+      await supabase
+        .from("gemini_logs")
+        .update({
+          response_text: JSON.stringify(recommendations),
+          processing_time_ms: processingTime,
+          success: true,
+        })
+        .eq("id", logEntry.id)
     }
 
-    // Store recommendations in database
-    const collegeMatches = recommendations.map((rec, index) => ({
-      user_id: user.id,
+    // Clear existing matches for this student
+    await supabase.from("college_matches").delete().eq("student_id", user.id)
+
+    // Store new recommendations
+    const matchesToInsert = recommendations.recommendations.map((rec) => ({
+      student_id: user.id,
       college_name: rec.college_name,
-      match_percentage: rec.match_percentage,
-      reasoning: rec.reasoning,
-      pros: rec.pros,
-      cons: rec.cons,
-      fit_category: rec.fit_category,
-      rank_order: index + 1,
+      match_score: rec.match_score,
+      justification: rec.justification,
+      source_links: rec.source_links || [],
+      country: rec.country,
+      city: rec.city,
+      program_type: rec.program_type,
+      estimated_cost: rec.estimated_cost,
+      admission_requirements: rec.admission_requirements,
+      profile_snapshot: profileData,
     }))
 
-    // Clear existing matches for this user
-    await supabase.from("college_matches").delete().eq("user_id", user.id)
-
-    // Insert new matches
-    const { error: insertError } = await supabase.from("college_matches").insert(collegeMatches)
+    const { data: insertedMatches, error: insertError } = await supabase
+      .from("college_matches")
+      .insert(matchesToInsert)
+      .select()
 
     if (insertError) {
-      console.error("Database error:", insertError)
-      return {
-        success: false,
-        error: "Failed to save recommendations to database",
-      }
+      console.error("Error storing college matches:", insertError)
+      return { success: false, error: "Failed to store recommendations" }
     }
 
-    return {
-      success: true,
-      matches: collegeMatches,
-      message: `Generated ${collegeMatches.length} college recommendations`,
-    }
+    return { success: true, matches: insertedMatches }
   } catch (error: any) {
-    console.error("College matching error:", error)
-    return {
+    const processingTime = Date.now() - startTime
+
+    // Log the error
+    await supabase.from("gemini_logs").insert({
+      student_id: user.id,
+      prompt_text: constructGeminiPrompt(profileData, user.full_name),
+      model_used: "gemini-1.5-pro",
+      processing_time_ms: processingTime,
       success: false,
-      error: error.message || "An unexpected error occurred",
-    }
+      error_message: error.message,
+    })
+
+    console.error("Gemini API error:", error)
+    return { success: false, error: "Failed to generate recommendations. Please try again." }
   }
 }
 
-export async function getCollegeMatches() {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return { success: false, error: "User not authenticated", matches: [] }
-    }
+function constructGeminiPrompt(profile: StudentProfile, studentName: string): string {
+  return `You are an expert in global university admissions and college advising with access to comprehensive data from top university ranking sites, admission statistics, and financial aid information. A student named ${studentName} has provided the following detailed profile:
 
-    const supabase = createClient()
+ACADEMIC PROFILE:
+${profile.test_type ? `- Test Type: ${profile.test_type}` : ""}
+${profile.total_score ? `- Total Score: ${profile.total_score}` : ""}
+${profile.gpa ? `- GPA: ${profile.gpa}` : ""}
+${profile.sat_score ? `- SAT Score: ${profile.sat_score}` : ""}
+${profile.act_score ? `- ACT Score: ${profile.act_score}` : ""}
+${profile.ib_score ? `- IB Score: ${profile.ib_score}` : ""}
+${profile.a_level_grades ? `- A-Level Grades: ${profile.a_level_grades}` : ""}
+${profile.hl_subjects?.length ? `- HL Subjects: ${profile.hl_subjects.join(", ")}` : ""}
+${profile.sl_subjects?.length ? `- SL Subjects: ${profile.sl_subjects.join(", ")}` : ""}
 
-    const { data: matches, error } = await supabase
-      .from("college_matches")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("rank_order", { ascending: true })
+PREFERENCES & GOALS:
+${profile.intended_major ? `- Intended Major: ${profile.intended_major}` : ""}
+${profile.campus_type ? `- Campus Type: ${profile.campus_type}` : ""}
+${profile.location_preference ? `- Location Preference: ${profile.location_preference}` : ""}
+${profile.distance_from_home ? `- Distance from Home: ${profile.distance_from_home}` : ""}
+${profile.financial_aid_needed ? `- Financial Aid Needed: ${profile.financial_aid_needed ? "Yes" : "No"}` : ""}
+${profile.budget_range ? `- Budget Range: ${profile.budget_range}` : ""}
+${profile.career_goals ? `- Career Goals: ${profile.career_goals}` : ""}
+${profile.preferred_class_size ? `- Preferred Class Size: ${profile.preferred_class_size}` : ""}
+${profile.research_interest ? `- Research Interest: ${profile.research_interest ? "Yes" : "No"}` : ""}
 
-    if (error) {
-      console.error("Database error:", error)
-      return { success: false, error: "Failed to fetch matches", matches: [] }
-    }
+BACKGROUND & EXPERIENCE:
+${profile.extracurriculars?.length ? `- Extracurriculars: ${profile.extracurriculars.join(", ")}` : ""}
+${profile.work_experience ? `- Work Experience: ${profile.work_experience}` : ""}
+${profile.volunteer_work ? `- Volunteer Work: ${profile.volunteer_work}` : ""}
+${profile.languages?.length ? `- Languages: ${profile.languages.join(", ")}` : ""}
+${profile.interests?.length ? `- Interests: ${profile.interests.join(", ")}` : ""}
+${profile.special_circumstances ? `- Special Circumstances: ${profile.special_circumstances}` : ""}
 
-    return {
-      success: true,
-      matches: matches || [],
-    }
-  } catch (error: any) {
-    console.error("Get matches error:", error)
-    return {
-      success: false,
-      error: error.message || "An unexpected error occurred",
-      matches: [],
-    }
-  }
+TASK:
+Using your expertise and knowledge of global universities, please:
+
+1. **Think step-by-step** about this student's profile:
+   - Analyze their academic competitiveness
+   - Evaluate fit with their stated preferences
+   - Consider financial aid availability and affordability
+   - Assess campus culture and environment match
+   - Factor in admission chances based on historical data
+
+2. **Recommend 8-12 universities** that would be excellent matches, including:
+   - 2-3 "reach" schools (competitive but possible)
+   - 4-6 "match" schools (good fit with solid admission chances)
+   - 2-3 "safety" schools (likely admission with good programs)
+
+3. **For each recommendation**, provide:
+   - A match score between 0.0 and 1.0 (where 1.0 is perfect match)
+   - A 2-3 sentence justification explaining why this university fits
+   - Specific reasons related to academics, culture, location, and opportunities
+   - Include source information when possible (topuniversities.com, collegevine.com, etc.)
+
+4. **Consider global universities** including but not limited to:
+   - Top US universities (Ivy League, state schools, liberal arts colleges)
+   - UK universities (Russell Group, etc.)
+   - Canadian universities
+   - Australian universities
+   - European universities with English programs
+   - Asian universities with strong international programs
+
+Please provide comprehensive, thoughtful recommendations that truly match this student's profile and goals. Focus on universities that offer strong programs in their intended field, align with their preferences, and provide realistic admission opportunities.`
 }
 
-// ────────────────────────────────────────────────────────────
-//  █ Fetch current user's matches (used by CollegeMatchesView)
-// ────────────────────────────────────────────────────────────
 export async function getStudentCollegeMatches(): Promise<{
   success: boolean
   error?: string
   matches?: CollegeMatch[]
 }> {
   const user = await getCurrentUser()
-  if (!user) {
-    return { success: false, error: "User not authenticated" }
+
+  if (!user || user.role !== "student") {
+    return { success: false, error: "Only students can view their college matches" }
   }
 
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("college_matches")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("rank_order", { ascending: true })
+  const supabase = await createClient()
 
-  if (error) {
-    console.error("Get matches error:", error)
-    return { success: false, error: "Failed to fetch matches" }
+  try {
+    const { data, error } = await supabase
+      .from("college_matches")
+      .select("*")
+      .eq("student_id", user.id)
+      .order("match_score", { ascending: false })
+
+    if (error) {
+      // Handle case where table doesn't exist in preview
+      if ((error as any).code === "42P01") {
+        console.warn("college_matches table not found – returning empty list (preview mode)")
+        return { success: true, matches: [] }
+      }
+      console.error("Get college matches error:", error)
+      return { success: false, error: "Failed to load college matches" }
+    }
+
+    return { success: true, matches: data || [] }
+  } catch (error: any) {
+    console.error("Get college matches process error:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
   }
-
-  return { success: true, matches: data || [] }
 }
 
-// ────────────────────────────────────────────────────────────
-//  █ Delete all current user's matches (Clear-All button)
-// ────────────────────────────────────────────────────────────
 export async function deleteCollegeMatches(): Promise<{ success: boolean; error?: string }> {
   const user = await getCurrentUser()
-  if (!user) {
-    return { success: false, error: "User not authenticated" }
+
+  if (!user || user.role !== "student") {
+    return { success: false, error: "Only students can delete their college matches" }
   }
 
-  const supabase = createClient()
-  const { error } = await supabase.from("college_matches").delete().eq("user_id", user.id)
+  const supabase = await createClient()
 
-  if (error) {
-    console.error("Delete matches error:", error)
-    return { success: false, error: "Failed to delete matches" }
+  try {
+    const { error } = await supabase.from("college_matches").delete().eq("student_id", user.id)
+
+    if (error) {
+      console.error("Delete college matches error:", error)
+      return { success: false, error: "Failed to delete college matches" }
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Delete college matches process error:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
   }
-
-  return { success: true }
 }
