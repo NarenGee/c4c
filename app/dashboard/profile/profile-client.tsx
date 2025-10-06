@@ -45,6 +45,8 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { generateCollegeRecommendations } from "@/app/actions/college-matching"
 import { ProfileGuidanceChat } from "@/components/profile/profile-guidance-chat"
+import { RecommendationsLoadingOverlay } from "@/components/college-matching/recommendations-loading-overlay"
+import { useRecommendationsLoading } from "@/hooks/use-recommendations-loading"
 import {
   Tooltip,
   TooltipContent,
@@ -513,12 +515,20 @@ const A_LEVEL_SUBJECTS = [
 
 // Add types for formReducer
 function formReducer(state: typeof initialFormData, action: { field: string; value: any }): typeof initialFormData {
-  // Special handling for dreamColleges to ensure it's always an array
+  // Special handling for array fields to ensure they're always arrays
   if (action.field === 'dreamColleges') {
     const newDreamColleges = Array.isArray(action.value) ? action.value : [];
     return {
       ...state,
       dreamColleges: newDreamColleges
+    };
+  }
+  
+  if (action.field === 'weatherClimatePreference') {
+    const newWeatherPreference = Array.isArray(action.value) ? action.value : [];
+    return {
+      ...state,
+      weatherClimatePreference: newWeatherPreference
     };
   }
   
@@ -751,6 +761,10 @@ const DreamCollegesSection = React.memo(function DreamCollegesSection({
 export function ProfileClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  
+  // Loading overlay state management
+  const { loadingState, startLoading, updateStatus, updateProgress, stopLoading, resetLoading } = useRecommendationsLoading()
+  
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generatingRecommendations, setGeneratingRecommendations] = useState(false)
@@ -770,7 +784,7 @@ export function ProfileClient() {
   const [collegeSearch, setCollegeSearch] = useState("");
   const [searchInput, setSearchInput] = useState(""); // Controlled input value
 
-  console.log('Preferred Countries:', formData.preferredCountries)
+    // console.log('Preferred Countries:', formData.preferredCountries)
 
   // Optimized change handlers using useCallback
   const handleCustomMajorChange = useCallback((value: string) => {
@@ -817,8 +831,8 @@ export function ProfileClient() {
 
   // Debug: Log when dream colleges change
   useEffect(() => {
-    console.log('Dream colleges in form data changed:', formData.dreamColleges)
-    console.log('Profile dream_colleges from DB:', profile?.dream_colleges)
+    // console.log('Dream colleges in form data changed:', formData.dreamColleges)
+    // console.log('Profile dream_colleges from DB:', profile?.dream_colleges)
   }, [formData.dreamColleges])
 
   // Mark recommendations as out-of-date when form data changes
@@ -957,14 +971,14 @@ export function ProfileClient() {
       }
 
       // Then try to get the profile
-      console.log("Fetching student profile for user:", user.id)
+      // console.log("Fetching student profile for user:", user.id)
       const { data: profiles, error: profileError } = await supabase
         .from("student_profiles")
         .select("*")
         .eq("user_id", user.id)
 
-      console.log("Profile query result:", { profiles, profileError })
-      console.log("Profile error details:", JSON.stringify(profileError, null, 2))
+      // console.log("Profile query result:", { profiles, profileError })
+      // console.log("Profile error details:", JSON.stringify(profileError, null, 2))
 
       if (profileError) {
         console.error("Profile fetch error:", profileError)
@@ -1161,7 +1175,9 @@ export function ProfileClient() {
       })
       dispatch({
         field: 'weatherClimatePreference',
-        value: profileData.college_preferences?.weatherClimatePreference || []
+        value: Array.isArray(profileData.college_preferences?.weatherClimatePreference) 
+          ? profileData.college_preferences.weatherClimatePreference 
+          : []
       })
       dispatch({
         field: 'studyAbroadImportant',
@@ -1527,14 +1543,27 @@ export function ProfileClient() {
     const generateRecommendations = async () => {
     console.log("=== GENERATE RECOMMENDATIONS FUNCTION CALLED ===")
     setGeneratingRecommendations(true)
+    
+    // Start loading overlay
+    startLoading()
+    updateStatus('Preparing your profile for analysis...')
+    
     try {
       // Store dream colleges before saving to ensure they're preserved
       const currentDreamColleges = [...formData.dreamColleges]
       console.log('Current dream colleges before saving:', currentDreamColleges)
       
       console.log("About to save profile...")
+      updateStatus('Saving your profile...')
+      updateProgress(10, 100)
       await handleSaveProfile()
       console.log("Profile save completed, now preparing recommendation data...")
+      
+      updateStatus('Analyzing your academic profile...')
+      updateProgress(25, 100)
+      
+      // Add realistic delay for analysis step
+      await new Promise(resolve => setTimeout(resolve, 1000))
       
       // Ensure dream colleges are preserved in the profile data
       const profileData = {
@@ -1616,19 +1645,37 @@ export function ProfileClient() {
         return
       }
 
+      updateStatus('Searching colleges that match your criteria...')
+      updateProgress(50, 100)
+      
       console.log("About to call generateCollegeRecommendations with user ID:", user.id)
       console.log("Profile data being sent:", JSON.stringify(profileData, null, 2))
+      
+      updateStatus('Calculating admission chances and fit scores...')
+      updateProgress(75, 100)
+      
+      // Add a small delay to show the progress before the actual API call
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
       const result = await generateCollegeRecommendations(user.id, profileData)
       console.log("generateCollegeRecommendations result:", result)
       if (result.success) {
+        updateStatus('Finalizing your personalized recommendations...')
+        updateProgress(90, 100)
+        
         setMessage({ type: "success", text: "College recommendations generated successfully! Redirecting..." })
         // Update the recommendations status
         setRecommendationsUpToDate(true)
         setLastRecommendationDate(new Date().toISOString())
+        
+        updateStatus('Recommendations complete! Redirecting...')
+        updateProgress(100, 100)
+        
         // Navigate to college recommendations page using router (client-side navigation)
         setTimeout(() => {
+          stopLoading()
           router.push('/college-recommendations')
-        }, 1500)
+        }, 2000)
       } else {
         // Check if it's a service unavailable error
         if (result.error?.includes('high demand') || result.error?.includes('temporarily unavailable')) {
@@ -1645,6 +1692,10 @@ export function ProfileClient() {
       setMessage({ type: "error", text: "Failed to generate recommendations. Please try again." })
     } finally {
       setGeneratingRecommendations(false)
+      // Stop loading overlay after a brief delay to show completion
+      setTimeout(() => {
+        stopLoading()
+      }, 1000)
     }
   }
 
@@ -1662,7 +1713,11 @@ export function ProfileClient() {
   type ArrayFields = 'preferredUSStates' | 'weatherClimatePreference' | 'intendedMajors' | 'preferredCountries' | 'dreamColleges';
   
   const handleArrayToggle = (field: ArrayFields, value: string) => {
-    dispatch({ field, value })
+    const currentArray = Array.isArray(formData[field]) ? formData[field] as string[] : []
+    const newArray = currentArray.includes(value)
+      ? currentArray.filter(item => item !== value)
+      : [...currentArray, value]
+    dispatch({ field, value: newArray })
   }
 
   const addExtracurricularActivity = () => {
@@ -1896,7 +1951,7 @@ export function ProfileClient() {
     if (formData.lgbtqFriendlyCampus) selected.push("LGBTQ+ Friendly Campus");
     if (formData.politicalActivism) selected.push(`Political Activism: ${formData.politicalActivism}`);
     if (formData.campusSafety) selected.push(`Campus Safety: ${formData.campusSafety}`);
-    if (formData.weatherClimatePreference && formData.weatherClimatePreference.length > 0) {
+    if (formData.weatherClimatePreference && Array.isArray(formData.weatherClimatePreference) && formData.weatherClimatePreference.length > 0) {
       selected.push(`Weather/Climate Preferences: ${formData.weatherClimatePreference.join(", ")}`);
     }
     
@@ -2690,10 +2745,10 @@ export function ProfileClient() {
                                   const isVisible = !formData.majorSearchTerm || major.toLowerCase().includes(formData.majorSearchTerm.toLowerCase());
                                   if (!isVisible) return null;
                                   return (
-                                    <button key={major} type="button" onClick={() => handleMajorToggle(major)} className={`w-full text-left px-4 py-2 hover:bg-slate-100 ${formData.intendedMajors.includes(major) ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}>
+                                    <button key={major} type="button" onClick={() => handleMajorToggle(major)} className={`w-full text-left px-4 py-2 hover:bg-slate-100 ${Array.isArray(formData.intendedMajors) && formData.intendedMajors.includes(major) ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}>
                                       <div className="flex items-center">
-                                        {formData.intendedMajors.includes(major) && (<svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>)}
-                                        <span className={formData.intendedMajors.includes(major) ? 'ml-2' : 'ml-6'}>{major}</span>
+                                        {Array.isArray(formData.intendedMajors) && formData.intendedMajors.includes(major) && (<svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>)}
+                                        <span className={Array.isArray(formData.intendedMajors) && formData.intendedMajors.includes(major) ? 'ml-2' : 'ml-6'}>{major}</span>
                                       </div>
                                     </button>
                                   );
@@ -2709,10 +2764,10 @@ export function ProfileClient() {
                                     <div key={category}>
                                       <div className="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-50">{category}</div>
                                       {visibleMajors.map(([major, value]) => (
-                                        <button key={value} type="button" onClick={() => handleMajorToggle(value)} className={`w-full text-left px-4 py-2 hover:bg-slate-100 pl-8 ${formData.intendedMajors.includes(value) ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}>
+                                        <button key={value} type="button" onClick={() => handleMajorToggle(value)} className={`w-full text-left px-4 py-2 hover:bg-slate-100 pl-8 ${Array.isArray(formData.intendedMajors) && formData.intendedMajors.includes(value) ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}>
                                           <div className="flex items-center">
-                                            {formData.intendedMajors.includes(value) && (<svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>)}
-                                            <span className={formData.intendedMajors.includes(value) ? 'ml-2' : 'ml-6'}>{major}</span>
+                                            {Array.isArray(formData.intendedMajors) && formData.intendedMajors.includes(value) && (<svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>)}
+                                            <span className={Array.isArray(formData.intendedMajors) && formData.intendedMajors.includes(value) ? 'ml-2' : 'ml-6'}>{major}</span>
                                           </div>
                                         </button>
                                       ))}
@@ -2786,7 +2841,7 @@ export function ProfileClient() {
       <SelectContent>
         <SelectGroup>
           <SelectLabel>Popular</SelectLabel>
-          {POPULAR_COUNTRIES.filter(c => !formData.preferredCountries.includes(c) || c === country).map((c) => (
+          {POPULAR_COUNTRIES.filter(c => !Array.isArray(formData.preferredCountries) || !formData.preferredCountries.includes(c) || c === country).map((c) => (
             <SelectItem key={`popular-${c}`} value={c}>
               {c}
             </SelectItem>
@@ -2796,7 +2851,7 @@ export function ProfileClient() {
         <SelectGroup>
           <SelectLabel>All Countries</SelectLabel>
           {ALL_COUNTRIES_ALPHABETICAL.filter(c =>
-            (!formData.preferredCountries.includes(c) || c === country)
+            (!Array.isArray(formData.preferredCountries) || !formData.preferredCountries.includes(c) || c === country)
           ).map((c) => (
             <SelectItem key={`all-${c}`} value={c}>
               {c}
@@ -2822,13 +2877,13 @@ export function ProfileClient() {
                           </Button>
                         )}
                       </div>
-                  {formData.preferredCountries.includes("United States") && (
+                  {Array.isArray(formData.preferredCountries) && formData.preferredCountries.includes("United States") && (
                     <div className="mt-4 space-y-3">
                       <div className="font-medium text-slate-700">Select US States</div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {US_STATES.map((state) => (
                           <div key={state} className="flex items-center space-x-2">
-                                <Checkbox id={state} checked={formData.preferredUSStates.includes(state)} onCheckedChange={() => handleArrayToggle("preferredUSStates", state)} />
+                                <Checkbox id={state} checked={Array.isArray(formData.preferredUSStates) && formData.preferredUSStates.includes(state)} onCheckedChange={() => handleArrayToggle("preferredUSStates", state)} />
                                 <label htmlFor={state} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{state}</label>
                           </div>
                         ))}
@@ -3079,7 +3134,7 @@ export function ProfileClient() {
                                     <div key={climate} className="flex items-center space-x-2">
                                       <Checkbox
                                         id={`climate-${climate}`}
-                                        checked={formData.weatherClimatePreference.includes(climate)}
+                                        checked={Array.isArray(formData.weatherClimatePreference) && formData.weatherClimatePreference.includes(climate)}
                                         onCheckedChange={() => handleArrayToggle("weatherClimatePreference", climate)}
                                       />
                                       <Label htmlFor={`climate-${climate}`} className="text-sm">{climate}</Label>
@@ -3526,6 +3581,14 @@ export function ProfileClient() {
           />
         </div>
       </div>
+      
+      {/* Loading Overlay */}
+      <RecommendationsLoadingOverlay
+        isVisible={loadingState.isVisible}
+        status={loadingState.status}
+        progress={loadingState.progress || undefined}
+        studentProfile={formData}
+      />
     </TooltipProvider>
   )
 } 

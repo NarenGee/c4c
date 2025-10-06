@@ -212,6 +212,18 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
       const result = await getStudentCollegeMatches()
       if (result.success && result.matches) {
         setMatches(result.matches)
+        
+        // Debug logging
+        const dreamCount = result.matches.filter(match => match.is_dream_college).length
+        const aiCount = result.matches.filter(match => !match.is_dream_college).length
+        console.log(`📊 Loaded matches: ${dreamCount} dream colleges, ${aiCount} AI recommendations`)
+        
+        // Reset dream colleges filter when new data is loaded to show all recommendations
+        setFilters((prev: any) => ({
+          ...prev,
+          showDreamColleges: false
+        }))
+        
         // Check which colleges are already in the user's list
         checkExistingColleges(result.matches)
       }
@@ -357,9 +369,15 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
   const filteredMatches = () => {
     let filtered = matches
 
+    // Debug logging
+    console.log(`🔍 Filtering ${matches.length} total matches`)
+    console.log(`🔍 Active tab: ${activeTab}`)
+    console.log(`🔍 Show dream colleges filter: ${filters.showDreamColleges}`)
+
     // Apply tab filter
     if (activeTab !== "all") {
       filtered = filtered.filter(match => match.fit_category === activeTab)
+      console.log(`🔍 After tab filter: ${filtered.length} matches`)
     }
 
     // Apply admission chance filter
@@ -430,6 +448,7 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
     // Apply dream college filter
     if (filters.showDreamColleges) {
       filtered = filtered.filter(match => match.is_dream_college === true)
+      console.log(`🔍 After dream colleges filter: ${filtered.length} matches`)
     }
 
     // Apply sorting
@@ -458,6 +477,7 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
       }
     })
 
+    console.log(`🔍 Final filtered results: ${filtered.length} matches`)
     return filtered
   }
 

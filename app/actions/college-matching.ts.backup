@@ -119,54 +119,6 @@ export interface CollegeMatch {
 
 let hasLoggedMissingKey = false
 
-// Helper function to clean JSON strings and remove problematic characters
-function cleanJsonString(jsonString: string): string {
-  return jsonString
-    .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // Remove control characters
-    .replace(/\r\n/g, '\n') // Normalize line endings
-    .replace(/\r/g, '\n') // Normalize line endings
-    .replace(/\n/g, ' ') // Replace newlines with spaces
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
-    .trim()
-}
-
-// Simple in-memory cache for AI responses (in production, use Redis or similar)
-const aiResponseCache = new Map<string, { data: any; timestamp: number }>()
-const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
-
-function getCacheKey(profile: StudentProfile): string {
-  // Create a hash of key profile attributes for caching
-  const keyData = {
-    gradeLevel: profile.gradeLevel,
-    gpa: profile.gpa,
-    sat_score: profile.sat_score,
-    act_score: profile.act_score,
-    intended_majors: profile.intended_majors,
-    preferred_countries: profile.preferred_countries,
-    collegeSize: profile.collegeSize,
-    campusSetting: profile.campusSetting,
-    budget_range: profile.budget_range,
-    firstGenerationStudent: profile.firstGenerationStudent,
-    financialAidNeeded: profile.financialAidNeeded
-  }
-  return JSON.stringify(keyData)
-}
-
-function getCachedResponse(cacheKey: string): any | null {
-  const cached = aiResponseCache.get(cacheKey)
-  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log("📦 Using cached AI response")
-    return cached.data
-  }
-  return null
-}
-
-function setCachedResponse(cacheKey: string, data: any): void {
-  aiResponseCache.set(cacheKey, { data, timestamp: Date.now() })
-  console.log("💾 Cached AI response")
-}
-
 // Helper function to fetch complete student profile from database
 async function getStudentProfile(studentId: string): Promise<StudentProfile | null> {
   try {
@@ -295,21 +247,18 @@ export async function generateCollegeRecommendations(studentId: string, profile:
       errors.push(`AI recommendations: ${aiRecommendationsResult.reason}`)
     }
     
-    // Fetch all matches from database to return complete results (optimized with single query)
+    // Fetch all matches from database to return complete results
     const { data: allMatches, error: fetchError } = await serviceSupabase
       .from("college_matches")
       .select("*")
       .eq("student_id", user.id)
-      .order("match_score", { ascending: false }) // Add ordering to avoid client-side sorting
     
     if (fetchError) {
       console.error("Error fetching final matches:", fetchError)
     }
     
-    // Debug logging to help identify issues
     const dreamCollegeCount = allMatches?.filter((match: any) => match.is_dream_college)?.length || 0
     const aiRecommendationCount = allMatches?.filter((match: any) => !match.is_dream_college)?.length || 0
-    console.log(`📊 Final results: ${dreamCollegeCount} dream colleges, ${aiRecommendationCount} AI recommendations`)
     
     // Return success if at least one process succeeded
     if (successCount > 0) {
@@ -356,10 +305,9 @@ async function processDreamColleges(currentDreamColleges: string[], user: any, p
         // Find dream colleges to remove (exist in DB but not in current profile)
         const collegesToRemove = existingNames.filter((name: string) => !currentDreamColleges.includes(name))
         
-        // Remove outdated dream colleges from database (batch operation)
+        // Remove outdated dream colleges from database
         if (collegesToRemove.length > 0) {
-          console.log(`🗑️ Removing ${collegesToRemove.length} outdated dream colleges...`)
-          const { error: deleteError } = await serviceSupabase
+          const { error: deleteError } = await supabase
             .from("college_matches")
             .delete()
             .eq("student_id", user.id)
@@ -368,8 +316,6 @@ async function processDreamColleges(currentDreamColleges: string[], user: any, p
           
           if (deleteError) {
             console.error("Error removing outdated dream colleges:", deleteError)
-          } else {
-            console.log("✅ Outdated dream colleges removed successfully")
           }
         }
         
@@ -480,64 +426,48 @@ async function processDreamColleges(currentDreamColleges: string[], user: any, p
   }
 }
 
-async function generateAIRecommendations(profile: StudentProfile, user: any, serviceSupabase: any, supabase?: any): Promise<any[]> {
+async function generateAIRecommendations(profile: StudentProfile, user: any, serviceSupabase: any, supabase?: any, isAdditionalGeneration?: boolean): Promise<any[]>{
   try {
     const aiStartTime = Date.now()
     console.log("🎯 Starting AI recommendation generation...")
     
-    // Check cache first
-    const cacheKey = getCacheKey(profile)
-    const cachedResponse = getCachedResponse(cacheKey)
-    if (cachedResponse) {
-      console.log("⚡ Using cached recommendations, inserting to database...")
-      
-      // Insert cached recommendations with current user ID
-      const recommendationsWithUserId = cachedResponse.map((rec: any) => ({
-        ...rec,
-        student_id: user.id,
-        is_dream_college: false,
-      }))
-      
-      // Only clear and insert if we have valid cached recommendations
-      if (recommendationsWithUserId.length > 0) {
-        // Clear existing non-dream college recommendations before inserting cached ones
-        const { error: deleteError } = await serviceSupabase
-          .from("college_matches")
-          .delete()
-          .eq("student_id", user.id)
-          .eq("is_dream_college", false)
-        
-        if (deleteError) {
-          console.error("Error clearing existing recommendations:", deleteError)
-          // Don't throw error here, continue with insert
-        }
-        
-        const { error: insertError } = await serviceSupabase
-          .from("college_matches")
-          .insert(recommendationsWithUserId)
-        
-        if (insertError) {
-          console.error("Error inserting cached recommendations:", insertError)
-        }
-      }
-      
-      const aiEndTime = Date.now()
-      console.log(`⚡ AI recommendations generated from cache in ${aiEndTime - aiStartTime}ms`)
-      return recommendationsWithUserId
-    }
+    // First, clear any existing non-dream college recommendations to avoid duplicates
+    const { error: deleteError } = await serviceSupabase
+      .from("college_matches")
+      .delete()
+      .eq("student_id", user.id)
+      .eq("is_dream_college", false)
     
-    // Don't clear existing recommendations yet - wait until we have new ones ready
+    if (deleteError) {
+      console.error("Error clearing existing recommendations:", deleteError)
+    }
 
-    // Create an optimized, concise prompt for faster AI responses
-    const prompt = `Generate college recommendations for this student:
+    // Create a comprehensive prompt for Gemini
+    const prompt = `Generate personalized college recommendations for this student.
 
-PROFILE: Grade ${profile.gradeLevel || "N/A"} | ${profile.countryOfResidence || "N/A"} | Major: ${Array.isArray(profile.intended_majors) ? profile.intended_majors.join(", ") : profile.intended_majors || "N/A"}
-ACADEMICS: GPA ${profile.gpa || "N/A"} | SAT ${profile.sat_score || "N/A"} | ACT ${profile.act_score || "N/A"}${profile.ibScore ? ` | IB ${profile.ibScore}` : ""}
-PREFERENCES: ${profile.collegeSize || "Any"} size | ${profile.campusSetting || "Any"} setting | ${profile.budget_range || "Any"} cost
-LOCATION: ${profile.preferred_countries?.join(", ") || "Any country"} | ${profile.preferred_us_states?.join(", ") || "Any state"}
-BACKGROUND: First-gen ${profile.firstGenerationStudent ? "Yes" : "No"} | Financial aid ${profile.financialAidNeeded ? "Yes" : "No"}
+STUDENT PROFILE:
+Grade: ${profile.gradeLevel || "Not specified"} | Country: ${profile.countryOfResidence || "Not specified"} | State: ${profile.stateProvince || "Not specified"}
+Major: ${Array.isArray(profile.intended_majors) ? profile.intended_majors.join(", ") : profile.intended_majors || "Not specified"}
+Grading: ${profile.gradingSystem || "Not specified"} | GPA: ${profile.gpa || "N/A"} | Class Rank: ${profile.classRank || "N/A"}
+SAT: ${profile.sat_score || "N/A"} | ACT: ${profile.act_score || "N/A"}
+${profile.ibSubjects?.length ? `IB: ${profile.ibSubjects.map(s => `${s.subject}:${s.level},${s.grade}`).join(", ")} | Total: ${profile.ibScore || "N/A"}` : ""}
+${profile.aLevelSubjects?.length ? `A-Levels: ${profile.aLevelSubjects.map(s => `${s.subject}:${s.grade}`).join(", ")}` : ""}
 
-Generate 12-15 college recommendations in JSON format. Categorize as "reach", "target", or "safety".
+EXTRACURRICULARS:
+${profile.extracurricularActivities?.map(a => `${a.activity} (Tier ${a.tier}): ${a.description}`).join(" | ") || "None"}
+
+PREFERENCES:
+Size: ${profile.collegeSize || "Any"} | Setting: ${profile.campusSetting || "Any"} | Cost: ${profile.budget_range || "Any"}
+Location: ${profile.geographicPreference?.join(", ") || "Any"} | US States: ${profile.preferred_us_states?.join(", ") || "Any"}
+Greek Life: ${profile.greekLifeImportant ? "Yes" : "No"} | Athletics: ${profile.strongAthletics ? "Yes" : "No"} | Diversity: ${profile.diverseStudentBody ? "Yes" : "No"}
+Alumni Network: ${profile.strongAlumniNetwork ? "Yes" : "No"} | Research: ${profile.researchOpportunities || "Any"} | Internships: ${profile.internshipOpportunities || "Any"}
+Study Abroad: ${profile.studyAbroadPrograms || (profile.studyAbroadImportant ? "Important" : "Any")}
+Weather: ${profile.weatherClimatePreference?.join(", ") || "Any"} | LGBTQ+ Friendly: ${profile.lgbtqFriendlyCampus ? "Yes" : "No"}
+
+BACKGROUND:
+Income: ${profile.familyIncome || "Not specified"} | First Gen: ${profile.firstGenerationStudent ? "Yes" : "No"} | Financial Aid: ${profile.financialAidNeeded ? "Yes" : "No"}
+
+Generate 10-12 college recommendations in JSON format. Categorize as "reach", "target", or "safety".
 
 **GEOGRAPHIC PRIORITY**: If specific countries are listed, at least 80% of recommendations must be from those countries.
 
@@ -565,6 +495,7 @@ Return ONLY valid JSON array with this structure:
 
 Requirements:
 - 30% Safety (80%+ chance), 50% Target (50-79% chance), 20% Reach (20-49% chance)
+- Focus on highest quality matches for each category
 - Use real universities with accurate data
 - Write all text in second person ("you/your")
 - Include website URLs
@@ -573,23 +504,23 @@ Requirements:
     // Generate recommendations using Gemini with optimal configuration and retry logic
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
     
-    // Optimized model configuration for faster responses
-    let maxTokens = 16000 // Reduced from 32000 for faster processing
+    // Try with maximum tokens first, then reduce if needed
+    let maxTokens = 32000
     let model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
       generationConfig: {
-        temperature: 0.3, // Increased for more consistent, faster responses
-        topP: 0.8, // Reduced for faster processing
-        topK: 20, // Reduced for faster processing
+        temperature: 0.1,
+        topP: 0.9,
+        topK: 40,
         maxOutputTokens: maxTokens,
       },
     })
     
-    // Optimized retry logic for faster failure handling
+    // Enhanced retry logic for service outages with better error handling
     let result
     let text: string = ""
     let retryCount = 0
-    const maxRetries = 3 // Reduced retries for faster failure handling
+    const maxRetries = 5 // Increased retries for better reliability
     
     while (retryCount < maxRetries) {
       try {
@@ -639,9 +570,9 @@ Requirements:
           throw error // Re-throw the error after all retries failed
         }
         
-        // Wait before retrying (optimized backoff for faster recovery)
-        const baseWaitTime = Math.pow(1.5, retryCount) * 1000 // 1.5s, 2.25s, 3.375s
-        const jitter = Math.random() * 500 // Add up to 0.5s of random delay
+        // Wait before retrying (exponential backoff with jitter)
+        const baseWaitTime = Math.pow(2, retryCount) * 1000 // 2s, 4s, 8s, 16s, 32s
+        const jitter = Math.random() * 1000 // Add up to 1s of random delay
         const waitTime = baseWaitTime + jitter
         console.log(`Waiting ${Math.round(waitTime)}ms before retry...`)
         await new Promise(resolve => setTimeout(resolve, waitTime))
@@ -687,8 +618,6 @@ Requirements:
 
     // Parse the JSON response with improved error handling
     let recommendations: any[]
-    let jsonString = ''
-    
     try {
       // Clean the response text
       let cleanedText = text.trim()
@@ -705,10 +634,10 @@ Requirements:
         throw new Error("No valid JSON array found in response")
       }
       
-      jsonString = cleanedText.substring(startIndex, lastIndex + 1)
+      let jsonString = cleanedText.substring(startIndex, lastIndex + 1)
       
-      // Clean the JSON string using the helper function
-      jsonString = cleanJsonString(jsonString)
+      // Only remove trailing commas - that's it!
+      jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1')
       
 
       
@@ -789,7 +718,6 @@ Requirements:
     } catch (parseError) {
       console.error("Failed to parse Gemini response:", parseError)
       console.error("Raw response (first 1000 chars):", text.substring(0, 1000))
-      console.error("Cleaned JSON string (first 1000 chars):", jsonString ? jsonString.substring(0, 1000) : 'N/A')
       console.error("Parse error details:", parseError instanceof Error ? parseError.message : parseError)
       
       // Log more details about where the error occurred
@@ -842,18 +770,6 @@ Requirements:
 
     // Insert the valid recommendations into the database
     if (validRecommendations.length > 0) {
-      // Clear existing non-dream college recommendations before inserting new ones
-      const { error: deleteError } = await serviceSupabase
-        .from("college_matches")
-        .delete()
-        .eq("student_id", user.id)
-        .eq("is_dream_college", false)
-      
-      if (deleteError) {
-        console.error("Error clearing existing recommendations:", deleteError)
-        // Don't throw error here, continue with insert
-      }
-      
       const { error: insertError } = await serviceSupabase
         .from("college_matches")
         .insert(validRecommendations)
@@ -864,9 +780,6 @@ Requirements:
       }
     }
 
-    // Cache the successful response
-    setCachedResponse(cacheKey, validRecommendations)
-    
     const aiEndTime = Date.now()
     console.log(`⚡ AI recommendations generated in ${aiEndTime - aiStartTime}ms`)
     
@@ -997,11 +910,9 @@ Be specific with test score ranges, GPA requirements, and key application compon
     }
     
     // Try to parse the JSON response
-    let cleanedText = ''
-    
     try {
       // Clean the response text to remove markdown code blocks
-      cleanedText = text.trim()
+      let cleanedText = text.trim()
       
       // More aggressive cleaning - find the JSON content between { and }
       const startIndex = cleanedText.indexOf('{')
@@ -1011,15 +922,10 @@ Be specific with test score ranges, GPA requirements, and key application compon
         cleanedText = cleanedText.substring(startIndex, lastIndex + 1)
       }
       
-      // Clean the JSON string using the helper function
-      cleanedText = cleanJsonString(cleanedText)
-      
       const collegeData = JSON.parse(cleanedText)
       return collegeData
     } catch (parseError) {
       console.error(`Failed to parse AI response for ${collegeName}:`, parseError)
-      console.error(`Raw response (first 500 chars):`, text.substring(0, 500))
-      console.error(`Cleaned text (first 500 chars):`, cleanedText ? cleanedText.substring(0, 500) : 'N/A')
       
       // Return fallback data if parsing fails
       return {

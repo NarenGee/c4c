@@ -2,14 +2,20 @@ import type React from "react"
 // ⬇️ must be first – installs the safe-fetch polyfill
 import "@/lib/preview-safe-fetch"
 
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
   title: "College Search Platform",
   description: "Find and match with the perfect colleges for your future",
   generator: "v0.dev",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({
@@ -20,7 +26,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         {/* CSP temporarily disabled for AI development */}
       </head>
       <body>

@@ -14,3 +14,6 @@ COMMENT ON COLUMN student_notes.college_name IS 'Optional college name for appli
 COMMENT ON COLUMN student_notes.meeting_date IS 'Optional meeting date for meeting notes';
 
 
+
+
+

@@ -7,7 +7,7 @@ export async function getCurrentUserSimple(): Promise<User | null> {
     const supabase = await createClient()
     const adminClient = createAdminClient()
 
-    console.log("Getting auth user...")
+    // console.log("Getting auth user...")
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !authUser) {
@@ -15,10 +15,10 @@ export async function getCurrentUserSimple(): Promise<User | null> {
       return null
     }
 
-    console.log("Auth user found:", authUser.id, authUser.email)
+    // console.log("Auth user found:", authUser.id, authUser.email)
 
     // Try to get user profile with admin client (bypass RLS issues)
-    console.log("Fetching user profile...")
+    // console.log("Fetching user profile...")
     const { data: user, error: userError } = await adminClient
       .from("users")
       .select(`
@@ -34,7 +34,7 @@ export async function getCurrentUserSimple(): Promise<User | null> {
       .single()
 
     if (user && !userError) {
-      console.log("User profile found successfully")
+      // console.log("User profile found successfully")
       
       // Fetch user roles separately
       const { data: roles } = await adminClient

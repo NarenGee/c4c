@@ -66,13 +66,18 @@ interface AIChatAssistantProps {
 
 const SUGGESTED_QUESTIONS = [
   "Who needs my immediate attention this week?",
-  "What are my priority action items for each student?",
-  "Which students are falling behind their timeline?",
-  "How should I prioritize my outreach efforts?",
-  "What's blocking my students from making progress?",
-  "Which students are ready for their next milestone?",
+  "What are Ethan's college preferences?",
+  "Show me Ethan's complete profile and preferences",
+  "What notes do I have about Maria's progress?",
+  "Which students have incomplete college applications?",
+  "What are John's college recommendations and match scores?",
+  "How are my students' profile completions looking?",
   "What patterns do you see across my caseload?",
-  "How can I better support my struggling students?"
+  "Which students need help with their college preferences?",
+  "Tell me about Sarah's academic profile and test scores",
+  "What are the top college matches for my students?",
+  "Which students have the most comprehensive profiles?",
+  "Show me all notes I've written about student progress"
 ]
 
 // Component to render assistant messages with clickable follow-up questions
@@ -404,7 +409,7 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
           <Bot className="h-6 w-6" />
           <div>
             <h3 className="font-semibold">AI Coach Assistant</h3>
-            <p className="text-sm text-slate-300">{students.length} students</p>
+            <p className="text-sm text-slate-300">{students.length} students • Access to all student data</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -546,6 +551,11 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
             <Lightbulb className="h-4 w-4 text-amber-500" />
             <span className="text-sm font-medium text-slate-700">Suggested Questions</span>
           </div>
+          <div className="mb-3 p-2 bg-blue-50 rounded-lg">
+            <p className="text-xs text-blue-700">
+              💡 I can access all student data: Overview, Profile, Preferences, Recommendations, Applications, and Notes
+            </p>
+          </div>
           <div className="space-y-2 max-h-32 overflow-y-auto">
             {SUGGESTED_QUESTIONS.slice(0, 4).map((question, index) => (
               <Button
@@ -570,7 +580,7 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask about your students..."
+            placeholder="Ask about profiles, preferences, applications, notes..."
             disabled={isLoading}
             className="flex-1"
           />

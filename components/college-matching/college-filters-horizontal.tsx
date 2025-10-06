@@ -265,6 +265,23 @@ export function CollegeFiltersHorizontal({
           </div>
         </div>
       </div>
+      {/* Dream Colleges */}
+      <div>
+        <div className="font-semibold text-slate-800 mb-2">Dream Colleges</div>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="showDreamColleges"
+            checked={filters.showDreamColleges}
+            onCheckedChange={(checked) => updateFilter("showDreamColleges", checked)}
+          />
+          <Label htmlFor="showDreamColleges" className="text-sm font-medium text-slate-700">
+            Show Only Dream Colleges
+          </Label>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          Filter to show only colleges you've selected as dream colleges in your profile
+        </p>
+      </div>
     </div>
   )
 
@@ -287,13 +304,17 @@ export function CollegeFiltersHorizontal({
         <AccordionTrigger className="font-semibold text-slate-800">Cost & Financial</AccordionTrigger>
         <AccordionContent>{groupedFilters.props.children[3]}</AccordionContent>
       </AccordionItem>
+      <AccordionItem value="dream">
+        <AccordionTrigger className="font-semibold text-slate-800">Dream Colleges</AccordionTrigger>
+        <AccordionContent>{groupedFilters.props.children[4]}</AccordionContent>
+      </AccordionItem>
     </Accordion>
   )
 
   // Mobile: inside bottom sheet, use expand/collapse logic
   const mobileCollapsedContent = (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2 justify-center">
+      <div className="flex gap-2 justify-center flex-wrap">
         {FIT_CATEGORIES.map(cat => (
           <Button
             key={cat.value}
@@ -310,6 +331,16 @@ export function CollegeFiltersHorizontal({
             {cat.label}
           </Button>
         ))}
+        {/* Dream College Filter */}
+        <Button
+          size="sm"
+          variant={filters.showDreamColleges ? "default" : "outline"}
+          className="rounded-full px-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0"
+          onClick={() => updateFilter("showDreamColleges", !filters.showDreamColleges)}
+        >
+          <Star className="h-4 w-4 mr-1" />
+          Dream Colleges
+        </Button>
       </div>
       <Button
         variant="outline"

@@ -21,6 +21,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { 
   Users, 
   UserCheck, 
@@ -32,7 +40,8 @@ import {
   Filter,
   Download,
   Edit,
-  Trash2
+  Trash2,
+  X
 } from "lucide-react"
 import type { User } from "@/lib/auth"
 import { AssignmentModal } from "@/components/super-admin/assignment-modal"
@@ -74,13 +83,17 @@ interface SystemStats {
 }
 
 export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'assignments' | 'analytics'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'assignments'>('overview')
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [users, setUsers] = useState<SystemUser[]>([])
   const [assignments, setAssignments] = useState<CoachAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
+  const [editingUser, setEditingUser] = useState<SystemUser | null>(null)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [deletingUser, setDeletingUser] = useState<SystemUser | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
 
   // Load data
   useEffect(() => {
@@ -98,7 +111,7 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
       }
 
       // Load users
-      const usersResponse = await fetch('/api/super-admin/users')
+      const usersResponse = await fetch('/api/super-admin/users?' + new Date().getTime())
       if (usersResponse.ok) {
         const usersData = await usersResponse.json()
         setUsers(usersData)
@@ -118,11 +131,95 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
   }
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+                         (user.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
     const matchesRole = roleFilter === 'all' || user.current_role === roleFilter
     return matchesSearch && matchesRole
   })
+
+  const handleEditUser = (user: SystemUser) => {
+    setEditingUser(user)
+    setEditModalOpen(true)
+  }
+
+  const handleSaveUser = async (updates: Partial<SystemUser>) => {
+    if (!editingUser) return
+
+    try {
+      const response = await fetch('/api/super-admin/users', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: editingUser.id,
+          updates
+        })
+      })
+
+      if (response.ok) {
+        // Reload data
+        loadData()
+        setEditModalOpen(false)
+        setEditingUser(null)
+      } else {
+        console.error('Failed to update user')
+      }
+    } catch (error) {
+      console.error('Error updating user:', error)
+    }
+  }
+
+  const handleDeleteUser = (user: SystemUser) => {
+    setDeletingUser(user)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDeleteUser = async () => {
+    if (!deletingUser) return
+
+    try {
+      const response = await fetch(`/api/super-admin/users?userId=${deletingUser.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Reload data
+        loadData()
+        setDeleteModalOpen(false)
+        setDeletingUser(null)
+      } else {
+        console.error('Failed to delete user')
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error)
+    }
+  }
+
+  // Group assignments by coach
+  const groupedAssignments = assignments.reduce((acc, assignment) => {
+    const coachId = assignment.coach_id
+    if (!acc[coachId]) {
+      acc[coachId] = {
+        coach: {
+          id: assignment.coach_id,
+          name: assignment.coach_name,
+          email: assignment.coach_email,
+          organization: assignment.coach_organization
+        },
+        students: []
+      }
+    }
+    acc[coachId].students.push({
+      id: assignment.student_id,
+      name: assignment.student_name,
+      email: assignment.student_email,
+      assigned_at: assignment.assigned_at,
+      is_active: assignment.is_active,
+      assignment_id: assignment.id
+    })
+    return acc
+  }, {} as Record<string, { coach: any, students: any[] }>)
 
   if (loading) {
     return (
@@ -149,7 +246,6 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
             { id: 'overview', label: 'Overview', icon: Shield },
             { id: 'users', label: 'User Management', icon: Users },
             { id: 'assignments', label: 'Coach Assignments', icon: UserCheck },
-            { id: 'analytics', label: 'Analytics', icon: GraduationCap },
           ].map((tab) => {
             const Icon = tab.icon
             return (
@@ -220,52 +316,6 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
             </Card>
           </div>
 
-          {/* Quick Actions */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-slate-800">Quick Actions</CardTitle>
-              <CardDescription>Common administrative tasks</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Button
-                  onClick={() => setActiveTab('users')}
-                  className="flex items-center gap-2 h-auto p-4 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                  variant="outline"
-                >
-                  <Users className="h-5 w-5" />
-                  <div className="text-left">
-                    <div className="font-medium">Manage Users</div>
-                    <div className="text-sm opacity-80">View and edit user accounts</div>
-                  </div>
-                </Button>
-
-                <Button
-                  onClick={() => setActiveTab('assignments')}
-                  className="flex items-center gap-2 h-auto p-4 bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                  variant="outline"
-                >
-                  <UserCheck className="h-5 w-5" />
-                  <div className="text-left">
-                    <div className="font-medium">Assign Coaches</div>
-                    <div className="text-sm opacity-80">Link students with coaches</div>
-                  </div>
-                </Button>
-
-                <Button
-                  onClick={() => setActiveTab('analytics')}
-                  className="flex items-center gap-2 h-auto p-4 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-                  variant="outline"
-                >
-                  <GraduationCap className="h-5 w-5" />
-                  <div className="text-left">
-                    <div className="font-medium">View Analytics</div>
-                    <div className="text-sm opacity-80">System reports and metrics</div>
-                  </div>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
@@ -328,7 +378,7 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize">
-                            {user.current_role.replace('_', ' ')}
+                            {user.current_role?.replace('_', ' ') || 'No role'}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -344,10 +394,10 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => handleEditUser(user)}>
                               <Edit className="h-3 w-3" />
                             </Button>
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => handleDeleteUser(user)} className="text-red-600 hover:text-red-700">
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
@@ -379,79 +429,206 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                 <AssignmentModal onAssignmentCreated={loadData} />
               </div>
 
-              {/* Assignments Table */}
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Coach</TableHead>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Organization</TableHead>
-                      <TableHead>Assigned Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {assignments.map((assignment) => (
-                      <TableRow key={assignment.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{assignment.coach_name}</div>
-                            <div className="text-sm text-slate-500">{assignment.coach_email}</div>
+              {/* Grouped Assignments */}
+              <div className="space-y-4">
+                {Object.values(groupedAssignments).map((group) => (
+                  <Card key={group.coach.id} className="border-0 shadow-lg">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg text-slate-800">{group.coach.name}</CardTitle>
+                          <CardDescription className="text-sm">
+                            {group.coach.email} • {group.coach.organization || 'No Organization'}
+                          </CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-slate-600">
+                            {group.students.length} Student{group.students.length !== 1 ? 's' : ''}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{assignment.student_name}</div>
-                            <div className="text-sm text-slate-500">{assignment.student_email}</div>
+                          <div className="text-xs text-slate-500">
+                            {group.students.filter(s => s.is_active).length} Active
                           </div>
-                        </TableCell>
-                        <TableCell>{assignment.coach_organization}</TableCell>
-                        <TableCell>
-                          {new Date(assignment.assigned_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={assignment.is_active ? "default" : "secondary"}>
-                            {assignment.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Button size="sm" variant="outline">
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-3">
+                        {group.students.map((student) => (
+                          <div key={student.assignment_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <div className="font-medium text-slate-800">{student.name}</div>
+                                  <div className="text-sm text-slate-500">{student.email}</div>
+                                </div>
+                                <div className="text-sm text-slate-600">
+                                  Assigned: {new Date(student.assigned_at).toLocaleDateString()}
+                                </div>
+                                <Badge variant={student.is_active ? "default" : "secondary"}>
+                                  {student.is_active ? "Active" : "Inactive"}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 ml-4">
+                              <Button size="sm" variant="outline">
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {Object.keys(groupedAssignments).length === 0 && (
+                  <div className="text-center text-slate-500 py-8">
+                    No coach-student assignments found.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Analytics Tab */}
-      {activeTab === 'analytics' && (
-        <div className="space-y-6">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-slate-800">System Analytics</CardTitle>
-              <CardDescription>Platform usage and performance metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center text-slate-600 py-8">
-                Analytics dashboard coming soon...
+
+      {/* Edit User Modal */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Make changes to the user profile here. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          {editingUser && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  defaultValue={editingUser.full_name || ""}
+                  className="col-span-3"
+                  onChange={(e) => {
+                    setEditingUser({...editingUser, full_name: e.target.value})
+                  }}
+                />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  defaultValue={editingUser.email || ""}
+                  className="col-span-3"
+                  onChange={(e) => {
+                    setEditingUser({...editingUser, email: e.target.value})
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="role" className="text-right">
+                  Role
+                </Label>
+                <Select 
+                  value={editingUser.current_role || ""} 
+                  onValueChange={(value) => {
+                    setEditingUser({...editingUser, current_role: value as any})
+                  }}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="coach">Coach</SelectItem>
+                    <SelectItem value="parent">Parent</SelectItem>
+                    <SelectItem value="counselor">Counselor</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="organization" className="text-right">
+                  Organization
+                </Label>
+                <Input
+                  id="organization"
+                  defaultValue={editingUser.organization || ""}
+                  placeholder="Enter organization name"
+                  className="col-span-3"
+                  onChange={(e) => {
+                    setEditingUser({...editingUser, organization: e.target.value})
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              if (editingUser) {
+                handleSaveUser({
+                  full_name: editingUser.full_name,
+                  email: editingUser.email,
+                  current_role: editingUser.current_role,
+                  organization: editingUser.organization
+                })
+              }
+            }}>
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Modal */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this user? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deletingUser && (
+            <div className="py-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                      <Trash2 className="h-5 w-5 text-red-600" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-red-900">{deletingUser.full_name || 'Unknown User'}</div>
+                    <div className="text-sm text-red-700">{deletingUser.email}</div>
+                    <div className="text-xs text-red-600 mt-1">
+                      Role: {deletingUser.current_role?.replace('_', ' ') || 'No role'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteUser}>
+              Delete User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

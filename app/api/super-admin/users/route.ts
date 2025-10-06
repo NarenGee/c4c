@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     // Check if user is super admin
     const currentUser = await getCurrentUser()
-    if (!currentUser || currentUser.role !== 'super_admin') {
+    if (!currentUser || currentUser.current_role !== 'super_admin') {
       return NextResponse.json(
         { error: "Unauthorized - Super admin access required" },
         { status: 403 }
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       email: user.email,
       full_name: user.full_name,
       role: user.role,
-      current_role: user.current_role,
+      current_role: user.current_role || user.role, // Fallback to role if current_role is null
       created_at: user.created_at,
       updated_at: user.updated_at,
       organization: user.coach_profiles?.[0]?.organization || null,
@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest) {
   try {
     // Check if user is super admin
     const currentUser = await getCurrentUser()
-    if (!currentUser || currentUser.role !== 'super_admin') {
+    if (!currentUser || currentUser.current_role !== 'super_admin') {
       return NextResponse.json(
         { error: "Unauthorized - Super admin access required" },
         { status: 403 }
@@ -86,21 +86,40 @@ export async function PUT(request: NextRequest) {
 
     const adminClient = createAdminClient()
 
+    // Separate organization from other updates
+    const { organization, ...userUpdates } = updates
+
     // Update user
-    const { error } = await adminClient
+    const { error: userError } = await adminClient
       .from("users")
       .update({
-        ...updates,
+        ...userUpdates,
         updated_at: new Date().toISOString(),
       })
       .eq("id", userId)
 
-    if (error) {
-      console.error("Failed to update user:", error)
+    if (userError) {
+      console.error("Failed to update user:", userError)
       return NextResponse.json(
         { error: "Failed to update user" },
         { status: 500 }
       )
+    }
+
+    // Update organization in coach_profiles if provided
+    if (organization !== undefined) {
+      const { error: profileError } = await adminClient
+        .from("coach_profiles")
+        .upsert({
+          user_id: userId,
+          organization: organization || null,
+          updated_at: new Date().toISOString(),
+        })
+
+      if (profileError) {
+        console.error("Failed to update coach profile:", profileError)
+        // Don't fail the entire request if profile update fails
+      }
     }
 
     return NextResponse.json({ success: true })
@@ -118,7 +137,7 @@ export async function DELETE(request: NextRequest) {
   try {
     // Check if user is super admin
     const currentUser = await getCurrentUser()
-    if (!currentUser || currentUser.role !== 'super_admin') {
+    if (!currentUser || currentUser.current_role !== 'super_admin') {
       return NextResponse.json(
         { error: "Unauthorized - Super admin access required" },
         { status: 403 }

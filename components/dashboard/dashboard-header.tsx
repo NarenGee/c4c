@@ -154,6 +154,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   width={240} 
                   height={55}
                   className="w-24 sm:w-32 md:w-48 lg:w-60"
+                  style={{ height: 'auto' }}
                 />
               </Link>
               <div className="bg-slate-700 text-white px-2 py-1 sm:px-3 rounded-full text-xs font-medium">

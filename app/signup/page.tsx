@@ -56,6 +56,7 @@ export default function SignupPage() {
                   width={240} 
                   height={55}
                   className="w-32 sm:w-48 md:w-60"
+                  style={{ height: 'auto' }}
                 />
               </Link>
               <div className="bg-slate-700 text-white px-2 py-1 sm:px-3 rounded-full text-xs font-medium">
