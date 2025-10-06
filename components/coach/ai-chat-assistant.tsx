@@ -375,17 +375,31 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
 
   if (!isOpen) {
     return (
-      <div className="fixed right-4 top-1/2 transform -translate-y-1/2 z-50">
-        <Button
-          onClick={onToggle}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 text-white font-medium rounded-lg"
-          size="sm"
-        >
-          <MessageSquare className="h-4 w-4 mr-2" />
-          AI Assistant
-          <ChevronLeft className="h-4 w-4 ml-2" />
-        </Button>
-      </div>
+      <>
+        {/* Mobile: bottom-right floating chat icon */}
+        <div className="fixed bottom-4 right-4 z-50 sm:hidden">
+          <Button
+            onClick={onToggle}
+            className="h-12 w-12 rounded-full p-0 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-xl"
+            size="icon"
+            aria-label="Open AI Assistant"
+          >
+            <MessageSquare className="h-5 w-5 text-white" />
+          </Button>
+        </div>
+        {/* Desktop/Tablet: mid-right label button */}
+        <div className="hidden sm:block fixed right-4 top-1/2 transform -translate-y-1/2 z-50">
+          <Button
+            onClick={onToggle}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 text-white font-medium rounded-lg"
+            size="sm"
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            AI Assistant
+            <ChevronLeft className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </>
     )
   }
 

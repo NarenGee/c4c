@@ -236,10 +236,13 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
 
   const checkExistingColleges = async (matches: CollegeMatch[]) => {
     try {
-      const result = await getMyCollegeList()
+      const result = await getMyCollegeList().catch((err: any) => {
+        console.error("getMyCollegeList failed:", err)
+        return null as any
+      })
       
-      if (result.success && result.data) {
-        const existingNames = new Set(result.data.map(c => c.college_name.toLowerCase()))
+      if (result && result.success && result.data) {
+        const existingNames = new Set((result.data as any[]).map((c: any) => String(c.college_name || '').toLowerCase()))
         const alreadyAdded = matches
           .filter(match => existingNames.has(match.college_name.toLowerCase()))
           .map(match => match.id)
@@ -902,7 +905,7 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
                       <Button
                         variant="default"
                         size="lg"
-                        onClick={() => setShowGuidanceChat(true)}
+                        onClick={() => { console.log('Get Guidance clicked'); setShowGuidanceChat(true) }}
                         className="flex-shrink-0 flex items-center gap-2 rounded-full px-6 py-2 font-semibold shadow-md bg-gradient-to-r from-blue-600 to-blue-400 text-white hover:from-blue-700 hover:to-blue-500 focus:ring-2 focus:ring-blue-300 transition-all"
                       >
                         <span className="text-white text-lg font-bold highlight-pulse">?</span>

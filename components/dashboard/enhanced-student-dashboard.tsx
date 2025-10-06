@@ -1011,36 +1011,39 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#E5E7E8] via-[#f5f6f7] to-[#E5E7E8]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6 sm:space-y-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="space-y-4 sm:space-y-6 lg:space-y-8">
           {/* Tabs */}
           <Tabs defaultValue="home" className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-white shadow-xl rounded-xl border border-slate-200">
-              <TabsTrigger value="home" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white rounded-lg">
-                <Home className="h-4 w-4" />
-                Home
+              <TabsTrigger value="home" className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white rounded-lg px-2 sm:px-3">
+                <Home className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Home</span>
+                <span className="sm:hidden text-xs">Home</span>
               </TabsTrigger>
-              <TabsTrigger value="notes" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white rounded-lg">
-                <StickyNote className="h-4 w-4" />
-                Notes & Actions
+              <TabsTrigger value="notes" className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white rounded-lg px-2 sm:px-3">
+                <StickyNote className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Notes & Actions</span>
+                <span className="sm:hidden text-xs">Notes</span>
               </TabsTrigger>
-              <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white rounded-lg">
-                <Calendar className="h-4 w-4" />
-                Application Timeline
+              <TabsTrigger value="timeline" className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white rounded-lg px-2 sm:px-3">
+                <Calendar className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Application Timeline</span>
+                <span className="sm:hidden text-xs">Timeline</span>
               </TabsTrigger>
             </TabsList>
 
             {/* Home Tab */}
             <TabsContent value="home" className="space-y-6">
               <Card className="relative rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl bg-gradient-to-br from-blue-50 via-white to-blue-100 border border-blue-100 overflow-visible">
-                <CardHeader className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-8 py-3 sm:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
-                  <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold tracking-wide">
+                <CardHeader className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
+                  <CardTitle className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold tracking-wide leading-tight">
                     Complete these steps to get the most out of the platform
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8 pt-6 sm:pt-8">
-                  <div className="mb-6">
-                    <div className="flex justify-between text-sm text-slate-600 mb-2">
+                <CardContent className="px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6 lg:pb-8 pt-4 sm:pt-6 lg:pt-8">
+                  <div className="mb-4 sm:mb-6">
+                    <div className="flex justify-between text-xs sm:text-sm text-slate-600 mb-2">
                       <span>Your progress: {completedTasks}/{totalTasks} tasks completed</span>
                     </div>
                     <Progress value={progressPercentage} className="h-2" />
@@ -1050,101 +1053,113 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                     {appTasks.map((task) => (
                       <div
                         key={task.id}
-                        className={`flex items-start gap-4 p-4 rounded-lg border ${
+                        className={`p-4 rounded-lg border ${
                           task.completed ? 'bg-green-50 border-green-200' : 'bg-white/80 border-slate-200'
                         }`}
                       >
-                        <button
-                          onClick={() => toggleTask(task.id)}
-                          className="mt-1"
-                        >
-                          {task.completed ? (
-                            <CheckCircle className="h-6 w-6 text-green-600" />
-                          ) : (
-                            <Circle className="h-6 w-6 text-slate-400" />
-                          )}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <task.icon className="h-5 w-5 text-blue-600" />
-                              <h4 className={`text-lg font-medium ${task.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
-                                {task.title}
-                              </h4>
-                              <Badge className={`text-xs ${getActionStatusColor(task.status)}`}>
-                                {task.status.replace('_', ' ')}
-                              </Badge>
+                        {/* Mobile-first layout */}
+                        <div className="flex items-start gap-3 mb-3">
+                          <button
+                            onClick={() => toggleTask(task.id)}
+                            className="mt-1 flex-shrink-0"
+                          >
+                            {task.completed ? (
+                              <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
+                            ) : (
+                              <Circle className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400" />
+                            )}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-2 mb-2">
+                              <task.icon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <h4 className={`text-base sm:text-lg font-medium ${task.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
+                                  {task.title}
+                                </h4>
+                                <Badge className={`text-xs mt-1 ${getActionStatusColor(task.status)}`}>
+                                  {task.status.replace('_', ' ')}
+                                </Badge>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {(() => {
-                                // Determine the correct href based on task completion and type
-                                let href = task.href;
-                                if (task.completed && (task.id === "3" || task.id === "4")) {
-                                  // Generate Recommendations or Add Recommendations to List when complete
-                                  href = "/college-list"; // My Applications page
-                                }
-                                
-                                if (href.startsWith('http')) {
-                                  return (
-                                    <a 
-                                      href={href} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                    >
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
-                                      >
-                                        {task.completed ? 'View' : 'Get Started'}
-                                        <ArrowRight className="h-3 w-3 ml-1" />
-                                      </Button>
-                                    </a>
-                                  );
-                                } else {
-                                  return (
-                                    <Link href={href}>
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
-                                      >
-                                        {task.completed ? 'View' : 'Get Started'}
-                                        <ArrowRight className="h-3 w-3 ml-1" />
-                                      </Button>
-                                    </Link>
-                                  );
-                                }
-                              })()}
-                            </div>
+                            <p className="text-sm text-slate-600 mb-3">{task.description}</p>
                           </div>
-                          <p className="text-sm text-slate-600 mb-3">{task.description}</p>
+                        </div>
+                        
+                        {/* Action button and status buttons - stacked on mobile */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          {/* Action Button */}
+                          <div className="flex justify-center sm:justify-start">
+                            {(() => {
+                              // Determine the correct href based on task completion and type
+                              let href = task.href;
+                              if (task.completed && (task.id === "3" || task.id === "4")) {
+                                // Generate Recommendations or Add Recommendations to List when complete
+                                href = "/college-list"; // My Applications page
+                              }
+                              
+                              if (href.startsWith('http')) {
+                                return (
+                                  <a 
+                                    href={href} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="w-full sm:w-auto"
+                                  >
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                                    >
+                                      {task.completed ? 'View' : 'Get Started'}
+                                      <ArrowRight className="h-3 w-3 ml-1" />
+                                    </Button>
+                                  </a>
+                                );
+                              } else {
+                                return (
+                                  <Link href={href} className="w-full sm:w-auto">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                                    >
+                                      {task.completed ? 'View' : 'Get Started'}
+                                      <ArrowRight className="h-3 w-3 ml-1" />
+                                    </Button>
+                                  </Link>
+                                );
+                              }
+                            })()}
+                          </div>
                           
                           {/* Status Override for All Tasks */}
-                          <div className="flex gap-2">
+                          <div className="flex gap-1 sm:gap-2 flex-wrap justify-center sm:justify-start">
                             <Button
                               size="sm"
                               variant={task.status === 'not_started' ? 'default' : 'outline'}
                               onClick={() => overrideTaskStatus(task.id, 'not_started')}
-                              className={task.status === 'not_started' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}
+                              className={`text-xs sm:text-sm ${task.status === 'not_started' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}`}
                             >
-                              Not Started
+                              <span className="hidden sm:inline">Not Started</span>
+                              <span className="sm:hidden">Not Started</span>
                             </Button>
                             <Button
                               size="sm"
                               variant={task.status === 'in_progress' ? 'default' : 'outline'}
                               onClick={() => overrideTaskStatus(task.id, 'in_progress')}
-                              className={task.status === 'in_progress' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}
+                              className={`text-xs sm:text-sm ${task.status === 'in_progress' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}`}
                             >
-                              In Progress
+                              <span className="hidden sm:inline">In Progress</span>
+                              <span className="sm:hidden">In Progress</span>
                             </Button>
                             <Button
                               size="sm"
                               variant={task.status === 'completed' ? 'default' : 'outline'}
                               onClick={() => overrideTaskStatus(task.id, 'completed')}
-                              className={task.status === 'completed' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}
+                              className={`text-xs sm:text-sm ${task.status === 'completed' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}`}
                             >
-                              Complete
+                              <span className="hidden sm:inline">Complete</span>
+                              <span className="sm:hidden">Complete</span>
                             </Button>
                           </div>
                         </div>
@@ -1158,16 +1173,16 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
             {/* Notes & Actions Tab */}
             <TabsContent value="notes" className="space-y-6">
               <Card className="relative rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl bg-gradient-to-br from-blue-50 via-white to-blue-100 border border-blue-100 overflow-visible">
-                <CardHeader className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-8 py-3 sm:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
-                  <StickyNote className="h-5 w-5 sm:h-6 sm:w-6 text-blue-200" />
-                  <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold tracking-wide">
+                <CardHeader className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
+                  <StickyNote className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-200 flex-shrink-0" />
+                  <CardTitle className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold tracking-wide leading-tight">
                     Notes & Actions
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8 pt-6 sm:pt-8">
+                <CardContent className="px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6 lg:pb-8 pt-4 sm:pt-6 lg:pt-8">
                       {/* Add Note Form */}
                       <div className="mb-6 space-y-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <Textarea
                             placeholder="Add a note or action item..."
                             value={newNote}
@@ -1178,77 +1193,85 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                           <Button
                             onClick={addNote}
                             disabled={!newNote.trim()}
-                            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 sm:self-start"
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
                         
-                    {newNoteType === 'action' && (
-                      <div className="flex gap-2">
-                        <Input
-                          type="date"
-                          placeholder="Due date (optional)"
-                          value={newNoteDueDate}
-                          onChange={(e) => setNewNoteDueDate(e.target.value)}
-                          className="w-48 border-2 rounded-lg bg-white/80 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button
-                        variant={newNoteType === 'note' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setNewNoteType('note')}
-                        className={newNoteType === 'note' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}
-                      >
-                        Note
-                      </Button>
-                      <Button
-                        variant={newNoteType === 'action' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setNewNoteType('action')}
-                        className={newNoteType === 'action' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}
-                      >
-                        Action
-                      </Button>
-                    </div>
-                    {newNoteType === 'action' && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant={newNotePriority === 'urgent_important' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setNewNotePriority('urgent_important')}
-                        >
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Urgent & Important
-                        </Button>
-                        <Button
-                          variant={newNotePriority === 'important_not_urgent' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setNewNotePriority('important_not_urgent')}
-                        >
-                          <Star className="h-3 w-3 mr-1" />
-                          Important
-                        </Button>
-                        <Button
-                          variant={newNotePriority === 'urgent_not_important' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setNewNotePriority('urgent_not_important')}
-                        >
-                          <Clock className="h-3 w-3 mr-1" />
-                          Urgent
-                        </Button>
-                        <Button
-                          variant={newNotePriority === 'not_urgent_not_important' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setNewNotePriority('not_urgent_not_important')}
-                        >
-                          <Circle className="h-3 w-3 mr-1" />
-                          Low Priority
-                        </Button>
-                      </div>
-                    )}
+                        {newNoteType === 'action' && (
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Input
+                              type="date"
+                              placeholder="Due date (optional)"
+                              value={newNoteDueDate}
+                              onChange={(e) => setNewNoteDueDate(e.target.value)}
+                              className="w-full sm:w-48 border-2 rounded-lg bg-white/80 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            />
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant={newNoteType === 'note' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setNewNoteType('note')}
+                            className={newNoteType === 'note' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}
+                          >
+                            Note
+                          </Button>
+                          <Button
+                            variant={newNoteType === 'action' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setNewNoteType('action')}
+                            className={newNoteType === 'action' ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200' : ''}
+                          >
+                            Action
+                          </Button>
+                        </div>
+                        {newNoteType === 'action' && (
+                          <div className="flex flex-wrap gap-1 sm:gap-2">
+                            <Button
+                              variant={newNotePriority === 'urgent_important' ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setNewNotePriority('urgent_important')}
+                              className="text-xs sm:text-sm"
+                            >
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              <span className="hidden sm:inline">Urgent & Important</span>
+                              <span className="sm:hidden">Urgent & Important</span>
+                            </Button>
+                            <Button
+                              variant={newNotePriority === 'important_not_urgent' ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setNewNotePriority('important_not_urgent')}
+                              className="text-xs sm:text-sm"
+                            >
+                              <Star className="h-3 w-3 mr-1" />
+                              <span className="hidden sm:inline">Important</span>
+                              <span className="sm:hidden">Important</span>
+                            </Button>
+                            <Button
+                              variant={newNotePriority === 'urgent_not_important' ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setNewNotePriority('urgent_not_important')}
+                              className="text-xs sm:text-sm"
+                            >
+                              <Clock className="h-3 w-3 mr-1" />
+                              <span className="hidden sm:inline">Urgent</span>
+                              <span className="sm:hidden">Urgent</span>
+                            </Button>
+                            <Button
+                              variant={newNotePriority === 'not_urgent_not_important' ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setNewNotePriority('not_urgent_not_important')}
+                              className="text-xs sm:text-sm"
+                            >
+                              <Circle className="h-3 w-3 mr-1" />
+                              <span className="hidden sm:inline">Low Priority</span>
+                              <span className="sm:hidden">Low Priority</span>
+                            </Button>
+                          </div>
+                        )}
                   </div>
 
                   {/* My Notes Section */}
@@ -1262,8 +1285,8 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                           <div key={conversation.note.id} className="space-y-3">
                             {/* Main Note */}
                             <div className="p-4 rounded-lg border bg-white/90 border-slate-200 shadow-sm">
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex items-center gap-2">
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <Badge variant="outline" className="text-xs">Note</Badge>
                                   <span className="text-sm text-slate-600">{conversation.note.author}</span>
                                   {conversation.note.college_name && (
@@ -1406,8 +1429,8 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                           
                           return (
                             <div key={conversation.note.id} className="p-4 rounded-lg border bg-blue-50/90 border-blue-200 shadow-sm">
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex items-center gap-2">
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">Coach Note</Badge>
                                   <span className="text-sm text-slate-600">{latestMessage.author}</span>
                                   {conversation.note.college_name && (
@@ -1433,10 +1456,15 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => openConversation(conversation)}
-                                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                                    className="text-blue-600 border-blue-300 hover:bg-blue-50 text-xs sm:text-sm"
                                   >
                                     <MessageSquare className="h-3 w-3 mr-1" />
-                                    {conversation.replies.length > 0 ? 'View Conversation' : 'Reply'}
+                                    <span className="hidden sm:inline">
+                                      {conversation.replies.length > 0 ? 'View Conversation' : 'Reply'}
+                                    </span>
+                                    <span className="sm:hidden">
+                                      {conversation.replies.length > 0 ? 'View' : 'Reply'}
+                                    </span>
                                   </Button>
                                 </div>
                               </div>
@@ -1712,13 +1740,13 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
             {/* Application Timeline Tab */}
             <TabsContent value="timeline" className="space-y-6">
               <Card className="relative rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl bg-gradient-to-br from-blue-50 via-white to-blue-100 border border-blue-100 overflow-visible">
-                <CardHeader className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-8 py-3 sm:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
-                  <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-blue-200" />
-                  <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold tracking-wide">
+                <CardHeader className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-200 flex-shrink-0" />
+                  <CardTitle className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold tracking-wide leading-tight">
                     Global Application Timeline
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8 pt-6 sm:pt-8">
+                <CardContent className="px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6 lg:pb-8 pt-4 sm:pt-6 lg:pt-8">
                   <div className="space-y-8">
                     {timelinePhases.map((phase, index) => {
                       const isExpanded = expandedPhases.has(phase.id);
@@ -1727,25 +1755,25 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                         <div key={phase.id} className="relative">
                           {/* Timeline line */}
                           {index < timelinePhases.length - 1 && (
-                            <div className="absolute left-6 top-16 w-0.5 h-24 bg-slate-200"></div>
+                            <div className="absolute left-5 sm:left-6 top-10 sm:top-16 w-0.5 h-20 sm:h-24 bg-slate-200"></div>
                           )}
                           
-                          <div className="flex items-start gap-6">
+                          <div className="flex items-start gap-4 sm:gap-6">
                             {/* Timeline dot with progress indicator */}
-                            <div className="relative">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getTimelineColor(phase.type)} shadow-lg border-2 ${phase.isActive ? 'border-blue-500 ring-2 ring-blue-200' : 'border-white'}`}>
+                            <div className="relative flex-shrink-0">
+                              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center ${getTimelineColor(phase.type)} shadow-lg border-2 ${phase.isActive ? 'border-blue-500 ring-2 ring-blue-200' : 'border-white'}`}>
                                 {getTimelineIcon(phase.type)}
                               </div>
                               {phase.isActive && (
-                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                               )}
                             </div>
                             
                             {/* Phase content */}
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <h4 className="text-lg font-semibold text-slate-800">{phase.name}</h4>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                  <h4 className="text-base sm:text-lg font-semibold text-slate-800">{phase.name}</h4>
                                   <Badge variant="outline" className="text-xs bg-white/80 border-slate-200">
                                     {phase.months}
                                   </Badge>
@@ -1755,10 +1783,10 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                                 </div>
                                 <button
                                   onClick={() => togglePhaseExpansion(phase.id)}
-                                  className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 transition-colors"
+                                  className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 transition-colors self-start sm:self-auto"
                                 >
-                                  <span>{isExpanded ? 'Hide Details' : 'Show Details'}</span>
-                                  <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                  <span className="text-xs sm:text-sm">{isExpanded ? 'Hide Details' : 'Show Details'}</span>
+                                  <ChevronDown className={`h-3 w-3 sm:h-4 sm:w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                 </button>
                               </div>
                               
@@ -1775,7 +1803,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                               
                               {/* Expanded content */}
                               {isExpanded && (
-                                <div className="mt-6 space-y-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div className="mt-6 space-y-4 sm:space-y-6 p-3 sm:p-4 bg-slate-50 rounded-lg border border-slate-200">
                                   {/* Milestones */}
                                   <div>
                                     <h5 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
@@ -1801,7 +1829,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                                     <div className="space-y-3">
                                       {phase.tasks.map((task) => (
                                         <div key={task.id} className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm">
-                                          <div className="flex items-start justify-between mb-2">
+                                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
                                             <h6 className="text-sm font-medium text-slate-800">{task.title}</h6>
                                             <div className="flex gap-2">
                                               <Badge variant="outline" className={`text-xs ${getTaskPriorityColor(task.priority)}`}>
@@ -1810,7 +1838,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                                             </div>
                                           </div>
                                           <p className="text-xs text-slate-600 mb-2">{task.description}</p>
-                                          <div className="flex items-center justify-between text-xs text-slate-500">
+                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs text-slate-500">
                                             <span>Due: {task.deadline}</span>
                                             <span>Est: {task.estimatedTime}</span>
                                           </div>
