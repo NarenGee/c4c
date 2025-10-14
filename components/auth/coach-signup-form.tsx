@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
 import { GraduationCap, Building2 } from "lucide-react"
+import { GoogleAuthButton } from "@/components/auth/google-auth-button"
 
 export function CoachSignupForm() {
   const [formData, setFormData] = useState({
@@ -85,6 +86,27 @@ export function CoachSignupForm() {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Google OAuth Button */}
+        <GoogleAuthButton 
+          mode="signup" 
+          role="coach"
+          onSuccess={() => {
+            router.push("/dashboard")
+            router.refresh()
+          }}
+          onError={(error) => setError(error)}
+        />
+
+        {/* Divider */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-slate-300" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-slate-500">Or continue with email</span>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

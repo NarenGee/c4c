@@ -2,14 +2,14 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import type { UserRole } from "@/lib/auth"
+import type { UserRoleType } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export interface SignupData {
   email: string
   password: string
   fullName: string
-  role: UserRole
+  role: UserRoleType
   invitationToken?: string // Add invitation token parameter
 }
 

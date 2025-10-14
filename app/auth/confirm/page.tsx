@@ -16,6 +16,7 @@ export default function ConfirmEmailPage() {
   const token = searchParams.get("token")
 
   useEffect(() => {
+    // Handle email confirmation
     if (!token) {
       setStatus("error")
       setMessage("Invalid confirmation link. Please check your email and try again.")
@@ -24,6 +25,7 @@ export default function ConfirmEmailPage() {
 
     confirmEmail(token)
   }, [token])
+
 
   const confirmEmail = async (token: string) => {
     try {

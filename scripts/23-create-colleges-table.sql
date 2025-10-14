@@ -1,4 +1,4 @@
--- Migration: Create colleges table
+n-- Migration: Create colleges table
 CREATE TABLE IF NOT EXISTS public.colleges (
   id uuid PRIMARY KEY,
   name text NOT NULL,

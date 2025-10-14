@@ -8,15 +8,16 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RoleSelector } from "./role-selector"
-import type { UserRole } from "@/lib/auth"
+import type { UserRoleType } from "@/lib/auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import { signupUser } from "@/app/actions/auth"
 import { Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { GoogleAuthButton } from "./google-auth-button"
 
 export function SignupForm() {
   const [step, setStep] = useState<"role" | "details">("role")
-  const [selectedRole, setSelectedRole] = useState<UserRole>()
+  const [selectedRole, setSelectedRole] = useState<UserRoleType>()
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -38,7 +39,7 @@ export function SignupForm() {
   useEffect(() => {
     const token = searchParams.get("token")
     const email = searchParams.get("email")
-    const role = searchParams.get("role") as UserRole
+    const role = searchParams.get("role") as UserRoleType
 
     console.log("URL params:", { token, email, role })
 
@@ -103,7 +104,7 @@ export function SignupForm() {
     }
   }
 
-  const handleRoleSelect = (role: UserRole) => {
+  const handleRoleSelect = (role: UserRoleType) => {
     setSelectedRole(role)
     setStep("details")
     // Emit event to notify parent component
@@ -196,15 +197,36 @@ export function SignupForm() {
   console.log("Rendering form with invitationInfo:", invitationInfo)
 
   return (
-    <div>
+    <div className="space-y-6">
       {invitationInfo && (
-        <Alert className="mb-6 border-blue-200 bg-blue-50">
+        <Alert className="border-blue-200 bg-blue-50">
           <Mail className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
             <strong>{invitationInfo.studentName}</strong> has invited you to view their college search progress as
             their <strong>{invitationInfo.relationship}</strong>.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Google OAuth Button - only show for non-invited users */}
+      {!invitationInfo && (
+        <>
+          <GoogleAuthButton 
+            mode="signup" 
+            onSuccess={() => window.location.href = "/dashboard"}
+            onError={(error) => setMessage({ type: 'error', text: error })}
+          />
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-slate-300" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-slate-500">Or continue with email</span>
+            </div>
+          </div>
+        </>
       )}
 
       <form onSubmit={handleSignup} className="space-y-6">
@@ -217,7 +239,7 @@ export function SignupForm() {
             onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))}
             required
             autoComplete="name"
-            className="h-12 border-slate-300 text-lg"
+            className="h-12 border-gray-300 text-lg focus:border-blue-500 focus:ring-blue-500"
             placeholder="Enter your full name"
           />
           {invitationInfo && (
@@ -236,7 +258,7 @@ export function SignupForm() {
               onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
               required
               autoComplete="email"
-              className="h-12 border-slate-300 text-lg"
+              className="h-12 border-gray-300 text-lg focus:border-blue-500 focus:ring-blue-500"
               placeholder="Enter your email"
             />
           </div>
@@ -252,7 +274,7 @@ export function SignupForm() {
             required
             minLength={6}
             autoComplete="new-password"
-            className="h-12 border-slate-300 text-lg"
+            className="h-12 border-gray-300 text-lg focus:border-blue-500 focus:ring-blue-500"
             placeholder="Create a password (min 6 characters)"
           />
         </div>
@@ -275,7 +297,7 @@ export function SignupForm() {
               type="button" 
               variant="outline" 
               onClick={handleBackToRole} 
-              className="flex-1 h-12 border-slate-300 text-lg"
+              className="flex-1 h-12 border-gray-300 text-slate-700 hover:bg-gray-50 text-lg"
             >
               Back
             </Button>
@@ -283,7 +305,7 @@ export function SignupForm() {
           <Button 
             type="submit" 
             disabled={loading} 
-            className="flex-1 h-12 bg-slate-700 hover:bg-slate-800 text-white text-lg font-medium"
+            className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium"
           >
             {loading 
               ? "Creating Account..." 
