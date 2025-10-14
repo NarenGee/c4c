@@ -21,9 +21,12 @@ interface CoachProfileProps {
 
 export function CoachProfile({ user }: CoachProfileProps) {
   const [profile, setProfile] = useState<CoachProfile>({ organization: "" })
+  const [fullName, setFullName] = useState(user.full_name)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingName, setSavingName] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [nameMessage, setNameMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
   useEffect(() => {
     fetchProfile()
@@ -53,6 +56,41 @@ export function CoachProfile({ user }: CoachProfileProps) {
       setMessage({ type: "error", text: "An unexpected error occurred" })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const saveName = async () => {
+    if (!fullName.trim()) {
+      setNameMessage({ type: "error", text: "Name is required" })
+      return
+    }
+
+    setSavingName(true)
+    setNameMessage(null)
+
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ full_name: fullName.trim() }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setNameMessage({ type: "error", text: data.error || "Failed to update name" })
+      } else {
+        setNameMessage({ type: "success", text: "Name updated successfully!" })
+        // Refresh the page to update the user name everywhere
+        setTimeout(() => window.location.reload(), 1500)
+      }
+    } catch (error) {
+      console.error("Error:", error)
+      setNameMessage({ type: "error", text: "An unexpected error occurred" })
+    } finally {
+      setSavingName(false)
     }
   }
 
@@ -128,18 +166,23 @@ export function CoachProfile({ user }: CoachProfileProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
+            {nameMessage && (
+              <Alert className={nameMessage.type === "error" ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
+                <AlertDescription className={nameMessage.type === "error" ? "text-red-800" : "text-green-800"}>
+                  {nameMessage.text}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+                <Label htmlFor="fullName">Full Name *</Label>
                 <Input
                   id="fullName"
-                  value={user.full_name}
-                  disabled
-                  className="bg-slate-50"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
                 />
-                <p className="text-xs text-slate-500">
-                  Contact support to change your name
-                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -154,6 +197,24 @@ export function CoachProfile({ user }: CoachProfileProps) {
                 </p>
               </div>
             </div>
+
+            <Button 
+              onClick={saveName} 
+              disabled={savingName || !fullName.trim() || fullName === user.full_name}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              {savingName ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Name
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
 

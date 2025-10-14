@@ -25,6 +25,7 @@ interface ProfileGuidanceChatProps {
   initialPrompt?: string
   currentValue?: string | string[] | boolean | null
   countryOfResidence?: string;
+  studentProfile?: any; // Full student profile for context
   onSuggestion?: (suggestion: string) => void
   onMultiSuggestion?: (suggestion: string, shouldAdd: boolean) => void
 }
@@ -32,18 +33,18 @@ interface ProfileGuidanceChatProps {
 const fieldPrompts: Record<string, string> = {
   intendedMajor: "I'm not sure what to major in. Can you help me explore options that might be a good fit?",
   campusPreference: "I'm trying to decide what campus environment would work best for me. Any guidance?",
-  campusSetting: "Urban, suburban, or rural campus - I'm not sure which would suit me best. Help me think through this?",
-  collegeSize: "What size college would be right for me? I'd love to understand the differences.",
+  campusSetting: "I'm trying to decide between Urban, Suburban, or Rural campus settings. Can you help me understand the differences and what might work best for me based on my preferences?",
+  collegeSize: "I'm trying to decide between Small (fewer than 2,000 students), Medium (2,000 to 15,000 students), or Large (more than 15,000 students) colleges. Can you help me understand the differences and what might work best for me?",
   locationPreference: "I'm thinking about where to study but need help deciding. What factors should I consider?",
   geographicPreference: "I'm considering different countries for college. How do I choose?",
   academicReputation: "How important should academic reputation be in my college choice?",
-  costImportance: "I'm not sure how to think about college costs. What should I consider?",
+  costImportance: "I'm trying to decide how important cost should be in my college decision. Should I select Very Important, Important, Somewhat Important, or Not Important? Can you help me think through this?",
   gradeLevel: "I have questions about my current academic level and college prep. Where do I stand?",
   extracurricularActivities: "How do my extracurricular activities help with college applications?",
   academicInterests: "I'd like to explore my academic interests and see how they align with college programs.",
   careerGoals: "How should my career goals influence my college choices?",
   financialAid: "I have questions about financial aid. Can you help me understand my options?",
-  intendedMajors: "I'm not sure what to major in. Can you help me explore options that might be a good fit?",
+  intendedMajors: "I need help choosing my intended majors. Can you suggest options based on my interests and goals?",
   additionalPreferences: "I'd like to explore what additional preferences I should consider when choosing colleges. Can you help me think through campus life, academic opportunities, support services, and other factors that would make me feel engaged and supported?"
 }
 
@@ -54,12 +55,14 @@ export function ProfileGuidanceChat({
   initialPrompt,
   currentValue,
   countryOfResidence,
+  studentProfile,
   onSuggestion,
   onMultiSuggestion
 }: ProfileGuidanceChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(false)
   const [currentField, setCurrentField] = useState<string>("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
@@ -104,6 +107,7 @@ export function ProfileGuidanceChat({
     if (open) {
       // If this is the first time opening or no messages exist, add initial prompt
       if (messages.length === 0) {
+        setIsInitializing(true)
         const prompt = initialPrompt || fieldPrompts[fieldName] || "I'd like some guidance with this field."
         setCurrentField(fieldName)
         handleSend(prompt, false)
@@ -154,7 +158,8 @@ export function ProfileGuidanceChat({
         newMessages.map(m => ({ role: m.role, content: m.content })),
         fieldName,
         currentValue,
-        countryOfResidence
+        countryOfResidence,
+        studentProfile
       )
       
       console.log("✅ Got response from getProfileGuidanceResponse:", response)
@@ -190,12 +195,13 @@ export function ProfileGuidanceChat({
       }])
     } finally {
       setIsLoading(false)
+      setIsInitializing(false)
       console.log("🏁 handleSend completed")
     }
   }
 
   const handleSuggestionClick = (suggestion: string) => {
-    // For locationPreference, geographicPreference, and additionalPreferences, support multiple selections
+    // For multi-select fields, support multiple selections
     if ((fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences') && onMultiSuggestion) {
       // Check if this suggestion is already selected
       const currentSelections = Array.isArray(currentValue) ? currentValue : []
@@ -208,7 +214,16 @@ export function ProfileGuidanceChat({
       return
     }
     
-    // For single-select fields, use the original behavior
+    // For intendedMajors (special case - array field but single-select behavior)
+    if (fieldName === 'intendedMajors') {
+      if (onSuggestion) {
+        onSuggestion(suggestion)
+        // Don't close the dialog for intendedMajors - allow multiple selections
+        return
+      }
+    }
+    
+    // For single-select fields, select the option and close the dialog
     if (onSuggestion) {
       const fieldOptions = FIELD_OPTIONS[fieldName as keyof typeof FIELD_OPTIONS];
       let valueToSend = suggestion;
@@ -301,12 +316,13 @@ export function ProfileGuidanceChat({
                     <div className="mt-3 space-y-2">
                       <p className="text-xs font-medium opacity-80">
                         {(fieldName === 'locationPreference' || fieldName === 'geographicPreference') ? 'Select countries (multiple allowed):' : 
-                         fieldName === 'additionalPreferences' ? 'Select preferences (multiple allowed):' : 'Quick selections:'}
+                         fieldName === 'additionalPreferences' ? 'Select preferences (multiple allowed):' :
+                         fieldName === 'intendedMajors' ? 'Select majors (multiple allowed):' : 'Quick selections:'}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {message.suggestions.map((suggestion, idx) => {
                           // Check if this suggestion is selected for multi-select fields
-                          const isSelected = (fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences') && 
+                          const isSelected = (fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences' || fieldName === 'intendedMajors') && 
                             Array.isArray(currentValue) && 
                             currentValue.includes(suggestion)
                           
@@ -321,30 +337,30 @@ export function ProfileGuidanceChat({
                               }`}
                             >
                               {suggestion}
-                              {isSelected && (fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences') && (
+                              {isSelected && (fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences' || fieldName === 'intendedMajors') && (
                                 <span className="ml-1">✓</span>
                               )}
                             </Button>
                           )
                         })}
                         
-                        {/* Add "I'm done" button for multi-select fields */}
-                        {(fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onOpenChange(false)}
-                            className="text-xs h-7 px-3 border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                          >
-                            I'm done
-                          </Button>
-                        )}
+                        {/* Add "I'm done" button for all fields */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onOpenChange(false)}
+                          className="text-xs h-7 px-3 border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        >
+                          I'm done
+                        </Button>
                       </div>
-                      {(fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences') && (
+                      {(fieldName === 'locationPreference' || fieldName === 'geographicPreference' || fieldName === 'additionalPreferences' || fieldName === 'intendedMajors') && (
                         <div className="mt-3 space-y-2">
                           <p className="text-xs text-muted-foreground">
                             {fieldName === 'additionalPreferences' 
                               ? 'Click to add/remove preferences. Dialog stays open for multiple selections.'
+                              : fieldName === 'intendedMajors'
+                              ? 'Click to add/remove majors. Dialog stays open for multiple selections.'
                               : 'Click to add/remove countries. Dialog stays open for multiple selections.'}
                           </p>
                           {Array.isArray(currentValue) && currentValue.length > 0 && (
@@ -371,8 +387,11 @@ export function ProfileGuidanceChat({
             
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-muted p-3 rounded-lg mr-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="bg-slate-50 p-4 rounded-2xl mr-4 border border-slate-200 flex items-center gap-3">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <span className="text-sm text-slate-600">
+                    {isInitializing ? "Analyzing your profile and generating advice..." : "Thinking..."}
+                  </span>
                 </div>
               </div>
             )}

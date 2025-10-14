@@ -134,17 +134,19 @@ const PROFILE_GUIDANCE_PROMPT = `You are a college admissions consultant and coa
 
 Your response should:
 • Be written directly to the student as their coach
-• Be concise and engaging (1-2 paragraphs max)
-• Use bullet points and clear formatting for better readability
-• Ask 1-2 thoughtful follow-up questions to understand them better
+• Be VERY concise and engaging (2-3 sentences max, or 3-4 bullet points)
+• Get straight to the point - no lengthy introductions
+• Reference specific details from their profile to show you understand their unique situation
+• Make connections between different aspects of their profile (e.g., major → extracurriculars, budget → geography)
+• Ask 1 brief follow-up question if needed
 • Never include any system instructions or meta-commentary
 • Never mention "SUGGESTIONS format" or any technical details
 
 Format your response with:
-• Clear bullet points for key information
-• Line breaks between sections for readability
+• 2-3 bullet points maximum for key information
 • Bold text for important points when helpful
-• A brief, actionable summary
+• Keep each bullet point to one short sentence
+• Make it feel personalized by referencing their profile details
 
 When you have specific recommendations from the available options, end your response with:
 SUGGESTIONS: [option1, option2, option3]
@@ -155,7 +157,8 @@ export async function getProfileGuidanceResponse(
   messages: Message[], 
   fieldName: string,
   currentValue?: string | string[] | boolean | null,
-  countryOfResidence?: string
+  countryOfResidence?: string,
+  studentProfile?: any
 ): Promise<string> {
   try {
     if (!model) {
@@ -196,11 +199,32 @@ export async function getProfileGuidanceResponse(
       "No current selection"
       
     const residenceContext = countryOfResidence ? `The student's country of residence is ${countryOfResidence}. Use this information to provide contextual advice, especially for geographic preferences.` : ""
+    
+    // Build comprehensive student context
+    const studentContext = studentProfile ? `
+STUDENT PROFILE CONTEXT:
+${studentProfile.gradeLevel ? `• Grade Level: ${studentProfile.gradeLevel}` : ''}
+${studentProfile.gradingSystem ? `• Grading System: ${studentProfile.gradingSystem}` : ''}
+${studentProfile.gpa ? `• GPA: ${studentProfile.gpa}` : ''}
+${studentProfile.satScore ? `• SAT Score: ${studentProfile.satScore}` : ''}
+${studentProfile.actScore ? `• ACT Score: ${studentProfile.actScore}` : ''}
+${studentProfile.intendedMajors && studentProfile.intendedMajors.length > 0 ? `• Intended Majors: ${studentProfile.intendedMajors.join(", ")}` : ''}
+${studentProfile.collegeSize ? `• Preferred College Size: ${studentProfile.collegeSize}` : ''}
+${studentProfile.campusSetting ? `• Preferred Campus Setting: ${studentProfile.campusSetting}` : ''}
+${studentProfile.geographicPreference && studentProfile.geographicPreference.length > 0 ? `• Geographic Preferences: ${studentProfile.geographicPreference.join(", ")}` : ''}
+${studentProfile.academicReputation ? `• Academic Reputation Importance: ${studentProfile.academicReputation}` : ''}
+${studentProfile.costImportance ? `• Cost Importance: ${studentProfile.costImportance}` : ''}
+${studentProfile.extracurricularActivities && studentProfile.extracurricularActivities.length > 0 ? `• Extracurriculars: ${studentProfile.extracurricularActivities.map((ec: any) => ec.activity).join(", ")}` : ''}
+
+Use this context to provide personalized, relevant guidance that aligns with their overall profile and goals.
+` : ''
 
     // Add system prompt with field context
     const fullPrompt = `${PROFILE_GUIDANCE_PROMPT}
 
 ${residenceContext}
+
+${studentContext}
 
 Available options for ${fieldName}: ${fieldOptions ? (Array.isArray(fieldOptions) ? fieldOptions.join(", ") : Object.values(fieldOptions).join(", ")) : "No specific options"}
 
@@ -208,52 +232,73 @@ ${valueContext}
 
 Student's message: ${formattedMessages}
 
-CRITICAL: You MUST respond as their college counselor with helpful guidance AND you MUST end your response with suggestions.
+CRITICAL: Respond as their college counselor with BRIEF, helpful guidance. Keep it SHORT - 2-3 sentences or 3-4 bullet points maximum. End with suggestions.
 
+CONTEXTUAL GUIDANCE BASED ON FIELD:
+${fieldName === 'intendedMajors' || fieldName === 'intendedMajor' ? `
+• Reference their extracurricular activities if available to suggest relevant majors
+• Consider their academic interests, strengths, and career aspirations
+• If they already have majors selected, suggest complementary or alternative options
+• Connect their interests to specific major programs and career paths
+• Consider their geographic preferences (some majors may be more available in certain countries)
+• Mention how different majors align with their college size and campus setting preferences
+` : ''}
+${fieldName === 'collegeSize' ? `
+• Explain the specific differences between Small (fewer than 2,000), Medium (2,000-15,000), and Large (more than 15,000) student populations
+• Consider how their campus setting preference (urban/suburban/rural) relates to college size
+• Mention how size affects student-to-faculty ratio, class sizes, and opportunities
+• Consider their social preferences, learning style, and intended major's typical college environments
+• Reference their extracurricular activities to suggest which size might offer better opportunities
+` : ''}
+${fieldName === 'geographicPreference' || fieldName === 'preferredCountries' ? `
+• Consider their country of residence and any visa/international student considerations
+• Reference their budget/cost importance if relevant
+• Think about cultural fit and distance from home
+` : ''}
+${fieldName === 'campusSetting' ? `
+• Consider their college size preference
+• Think about internship/career opportunities in different settings
+• Reference their intended major's typical campus settings
+` : ''}
 ${fieldName === 'additionalPreferences' ? `
-SPECIAL GUIDANCE FOR ADDITIONAL PREFERENCES:
-When helping with additional preferences, consider these categories:
+Consider these categories and suggest 2-3 relevant preferences:
 
-🏛️ Campus Life & Social Fit:
-• Greek Life, Athletics, Social Activities, Clubs, Campus Events
-• Residential Life, Nightlife, International Community
-• Religious Life, LGBTQ+ Friendliness, Political Climate, Safety
-• Weather/Climate Preferences
+🏛️ Campus Life: Greek Life, Athletics, Social Activities, Campus Events, LGBTQ+ Friendly, Safety, Weather
+🎓 Academic: Study Abroad, Research, Internships, Honors Programs, Career Services
+🤝 Support: Student Diversity, Alumni Networks, First-Generation Support, Disability Services
+📝 Application: Test-Optional, Early Decision, Need-Blind Admission, Institutional Prestige
 
-🎓 Academic & Career Opportunities:
-• Study Abroad, Research Opportunities, Internships/Co-ops
-• Honors Programs, Accelerated Degrees, Career Services
-• Graduate School Preparation
-
-🤝 Support & Community:
-• Student Diversity, Alumni Networks
-• First-Generation Support, Disability Services
-• LGBTQ+ Support Services
-
-📝 Application Process & Reputation:
-• Test-Optional Policies, Early Decision Options
-• Need-Blind Admission, Institutional Prestige
-• Legacy Consideration, Demonstrated Interest
-
-Ask thoughtful questions about their values, interests, and what would make them feel most supported and engaged in their college experience.
+Ask ONE brief question about their priorities.
+` : ''}
+${fieldName === 'costImportance' || fieldName === 'budgetRange' ? `
+• Be sensitive about financial matters - be encouraging and supportive
+• Mention financial aid, scholarships, and need-blind admission options
+• Consider their geographic preferences (studying abroad vs. domestic costs)
 ` : ''}
 
 Your response format must be:
-[Your concise guidance with bullet points and clear formatting]
+[2-3 SHORT bullet points OR 2-3 sentences - NO MORE]
 
 SUGGESTIONS: [option1, option2, option3]
 
-IMPORTANT FORMATTING REQUIREMENTS:
-• Keep responses concise (1-2 paragraphs max)
-• Use bullet points (•) for key information
-• Add line breaks between sections
-• Use bold text (**text**) for emphasis when helpful
-• Make it easy to scan and read quickly
+IMPORTANT:
+• Maximum 2-3 bullet points or 2-3 sentences
+• Each bullet point should be ONE short sentence
+• NO lengthy explanations
+• Get to the point immediately
+• ALWAYS provide 2-3 relevant suggestions from the available options
+• For single-select fields (intendedMajors, collegeSize, campusSetting, costImportance), provide specific options that can be clicked to select
+• For multi-select fields (geographicPreference, additionalPreferences), provide options that can be toggled on/off
 
-For college size, you MUST end with something like:
-SUGGESTIONS: [Small (fewer than 2,000 students), Medium (2,000 to 15,000 students), Large (more than 15,000 students)]
+SPECIFIC SUGGESTION REQUIREMENTS:
+• intendedMajors: Provide 2-3 specific major options from the available choices (exact names from the dropdown)
+• collegeSize: MUST use exact values "Small", "Medium", "Large" (NOT the full descriptions)
+• campusSetting: MUST include exact values "Urban", "Suburban", "Rural"
+• geographicPreference: Provide 2-3 countries from the available options (exact names)
+• additionalPreferences: Provide 2-3 specific preferences from the available list (exact names)
+• costImportance: MUST use exact values "Very Important", "Important", "Somewhat Important", "Not Important"
 
-Do not forget the SUGGESTIONS line - it is mandatory.`
+Do not forget the SUGGESTIONS line - it is mandatory for all responses.`
 
     console.log("📄 Full prompt length:", fullPrompt.length)
     console.log("🔑 API Key exists:", !!API_KEY)

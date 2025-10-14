@@ -67,28 +67,43 @@ export default function OAuthCallbackPage() {
       if (shouldCreateUser) {
         const defaultRole: UserRoleType = role || 'student'
         
-        // Create user_roles entry
+        // Create user_roles entry - use INSERT ON CONFLICT to handle existing entries
         try {
-          const { error: insertError } = await supabase
+          // First check if the role already exists
+          const { data: existingRoleEntry } = await supabase
             .from('user_roles')
-            .insert({
-              user_id: session.user.id,
-              role: defaultRole,
-              is_active: true,
-              is_primary: true,
-              organization: null
-            })
+            .select('*')
+            .eq('user_id', session.user.id)
+            .eq('role', defaultRole)
+            .single()
 
-          if (insertError) {
-            // If it's an RLS error, try to continue anyway
-            if (insertError.message.includes('infinite recursion') || insertError.message.includes('policy')) {
-              // Continue without user_roles entry
-            } else {
-              window.location.href = "/login?error=role_creation_failed"
-              return
+          if (!existingRoleEntry) {
+            // Only insert if it doesn't exist
+            const { error: insertError } = await supabase
+              .from('user_roles')
+              .insert({
+                user_id: session.user.id,
+                role: defaultRole,
+                is_active: true,
+                is_primary: true,
+                organization: null
+              })
+
+            if (insertError) {
+              // If it's an RLS error or duplicate key error, continue anyway
+              if (insertError.message.includes('infinite recursion') || 
+                  insertError.message.includes('policy') ||
+                  insertError.message.includes('duplicate') ||
+                  insertError.code === '23505') { // PostgreSQL unique violation code
+                console.log('Role entry already exists or RLS issue, continuing...')
+              } else {
+                console.error('Role creation error:', insertError)
+                // Don't fail for role creation errors - user can still proceed
+              }
             }
           }
         } catch (err) {
+          console.log('Role creation exception:', err)
           // Continue despite role creation error
         }
 
@@ -100,56 +115,116 @@ export default function OAuthCallbackPage() {
           .single()
 
         if (existingUserInUsers) {
-          // Update existing user with new role
-          const { error: updateError } = await supabase
-            .from('users')
-            .update({
+          // Update existing user - preserve edited name
+          try {
+            // Only update the name if the existing name is empty, null, or still looks like a default Google name
+            const shouldUpdateName = !existingUserInUsers.full_name || 
+                                    existingUserInUsers.full_name.trim() === '' ||
+                                    existingUserInUsers.full_name === 'Google User'
+            
+            const updateData: any = {
               role: defaultRole,
               current_role: defaultRole,
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || existingUserInUsers.full_name || 'Google User'
-            })
-            .eq('id', session.user.id)
+              updated_at: new Date().toISOString()
+            }
+
+            // Only update name if it hasn't been customized by the user
+            if (shouldUpdateName) {
+              updateData.full_name = session.user.user_metadata?.full_name || 
+                                     session.user.user_metadata?.name || 
+                                     session.user.email || 
+                                     'Google User'
+            }
+
+            const { error: updateError } = await supabase
+              .from('users')
+              .update(updateData)
+              .eq('id', session.user.id)
+            
+            if (updateError) {
+              console.error('User update error:', updateError)
+              // Continue anyway - user exists
+            }
+          } catch (err) {
+            console.log('User update exception:', err)
+            // Continue anyway
+          }
         } else {
           // Create new user
-          const { error: userInsertError } = await supabase
-            .from('users')
-            .insert({
-              id: session.user.id,
-              email: session.user.email || '',
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email || 'Google User',
-              role: defaultRole,
-              current_role: defaultRole
-            })
+          try {
+            const { error: userInsertError } = await supabase
+              .from('users')
+              .insert({
+                id: session.user.id,
+                email: session.user.email || '',
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email || 'Google User',
+                role: defaultRole,
+                current_role: defaultRole
+              })
+            
+            if (userInsertError) {
+              console.error('User insert error:', userInsertError)
+              // If it's a duplicate key error, that's okay - user exists
+              if (!userInsertError.message.includes('duplicate') && userInsertError.code !== '23505') {
+                // Only log non-duplicate errors
+                console.error('Unexpected user insert error:', userInsertError)
+              }
+            }
+          } catch (err) {
+            console.log('User insert exception:', err)
+            // Continue anyway
+          }
         }
 
         // Create appropriate profile based on role
         if (defaultRole === 'student') {
-          const { error: profileError } = await supabase
-            .from('student_profiles')
-            .insert({
-              user_id: session.user.id
-            })
+          // Check if student profile already exists
+          try {
+            const { data: existingStudentProfile } = await supabase
+              .from('student_profiles')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .single()
 
-          // Don't fail the whole process if profile creation fails
+            if (!existingStudentProfile) {
+              const { error: profileError } = await supabase
+                .from('student_profiles')
+                .insert({
+                  user_id: session.user.id
+                })
+
+              if (profileError && !profileError.message.includes('duplicate') && profileError.code !== '23505') {
+                console.error('Student profile creation error:', profileError)
+              }
+            }
+          } catch (err) {
+            console.log('Student profile exception:', err)
+            // Continue anyway
+          }
         } else if (defaultRole === 'coach') {
           // Check if coach profile already exists
-          const { data: existingCoachProfile } = await supabase
-            .from('coach_profiles')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single()
+          try {
+            const { data: existingCoachProfile } = await supabase
+              .from('coach_profiles')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .single()
 
-          if (!existingCoachProfile) {
-            try {
+            if (!existingCoachProfile) {
               const { error: profileError } = await supabase
                 .from('coach_profiles')
                 .insert({
                   user_id: session.user.id,
                   organization: null // Will be set later by the coach
                 })
-            } catch (err) {
-              // Continue despite coach profile creation error
+
+              if (profileError && !profileError.message.includes('duplicate') && profileError.code !== '23505') {
+                console.error('Coach profile creation error:', profileError)
+              }
             }
+          } catch (err) {
+            console.log('Coach profile exception:', err)
+            // Continue anyway
           }
         }
       } else if (existingUser || userError?.message?.includes('infinite recursion')) {

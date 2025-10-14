@@ -284,6 +284,17 @@ body {
   animation: guidance-banner-pulse 3s ease-in-out infinite;
 }
 
+/* Respect reduced motion for UI transitions */
+@media (prefers-reduced-motion: reduce) {
+  .transition-transform,
+  .transition-all,
+  .animate-shimmer,
+  .guidance-banner-pulse {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 /* Scrollbar Hide Utility */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* Internet Explorer 10+ */
@@ -292,6 +303,20 @@ body {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Safari and Chrome */
+}
+
+/* Progress Bar Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
 }
 
 /* Enhanced Hero Text Visibility */

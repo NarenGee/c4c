@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -123,24 +123,34 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
   const [showConversation, setShowConversation] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<{ note: Note; replies: Note[] } | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
+  const savedTaskStatesRef = useRef<any[]>([]);
+  const isInitializedRef = useRef(false);
 
-  // Mock data - in real implementation, this would come from API calls
+  // Load initial data
   useEffect(() => {
-    loadStudentData();
-    loadSavedTaskStates();
-    loadSavedNotes();
+    const initializeData = async () => {
+      // Load saved task states FIRST and store in ref
+      await loadSavedTaskStates();
+      // Initialize tasks with saved states already loaded
+      await loadStudentData();
+      // Load notes
+      await loadSavedNotes();
+      // Mark as initialized so auto-save can work
+      isInitializedRef.current = true;
+    };
+    initializeData();
   }, []);
 
-  // Auto-save task states to backend
+  // Auto-save task states to backend (but not on initial load)
   useEffect(() => {
-    if (appTasks.length > 0) {
+    if (appTasks.length > 0 && isInitializedRef.current) {
       saveTaskStates();
     }
   }, [appTasks]);
 
-  // Auto-save notes to backend
+  // Auto-save notes to backend (but not on initial load)
   useEffect(() => {
-    if (notes.length > 0) {
+    if (notes.length > 0 && isInitializedRef.current) {
       saveNotes();
     }
   }, [notes]);
@@ -151,17 +161,12 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
       if (response.ok) {
         const data = await response.json();
         const taskStates = data.taskStates;
-        setAppTasks(prev => prev.map(task => {
-          const savedState = taskStates.find((state: any) => state.task_id === task.id);
-          if (savedState) {
-            return {
-              ...task,
-              completed: savedState.completed,
-              status: savedState.status
-            };
-          }
-          return task;
-        }));
+        
+        // Store saved states in ref so they can be applied during task initialization
+        if (taskStates && taskStates.length > 0) {
+          savedTaskStatesRef.current = taskStates;
+          console.log('Loaded saved task states:', taskStates);
+        }
       }
     } catch (error) {
       console.error('Error loading saved task states:', error);
@@ -545,8 +550,8 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
       }
     ]);
 
-    // Initialize tasks - completion status will be determined by checkTaskCompletion
-    setAppTasks([
+    // Initialize tasks with saved states from ref
+    const initialTasks = [
       {
         id: "1",
         title: "Complete Student Profile",
@@ -554,7 +559,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
         completed: false,
         href: "/dashboard/profile",
         icon: UserIcon,
-        status: 'not_started',
+        status: 'not_started' as const,
         autoDerived: true,
       },
       {
@@ -564,7 +569,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
         completed: false,
         href: "/dashboard/profile#dream-colleges",
         icon: Heart,
-        status: 'not_started',
+        status: 'not_started' as const,
         autoDerived: true,
       },
       {
@@ -574,7 +579,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
         completed: false,
         href: "/dashboard/profile#recommendations",
         icon: Target,
-        status: 'not_started',
+        status: 'not_started' as const,
         autoDerived: true,
       },
       {
@@ -584,7 +589,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
         completed: false,
         href: "/college-recommendations",
         icon: BookOpen,
-        status: 'not_started',
+        status: 'not_started' as const,
         autoDerived: true,
       },
       {
@@ -594,10 +599,26 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
         completed: false,
         href: "https://cal.com/coachingforcollege/preliminary-meeting?overlayCalendar=true",
         icon: MessageSquare,
-        status: 'not_started',
+        status: 'not_started' as const,
         autoDerived: false,
       },
-    ]);
+    ];
+    
+    // Apply saved states from ref if they exist
+    const tasksWithSavedStates = initialTasks.map(task => {
+      const savedState = savedTaskStatesRef.current.find((state: any) => state.task_id === task.id);
+      if (savedState) {
+        console.log(`Applying saved state for task ${task.id}:`, savedState);
+        return {
+          ...task,
+          completed: savedState.completed,
+          status: savedState.status
+        };
+      }
+      return task;
+    });
+    
+    setAppTasks(tasksWithSavedStates);
   };
 
   const checkTaskCompletion = async () => {
@@ -1057,7 +1078,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                           task.completed ? 'bg-green-50 border-green-200' : 'bg-white/80 border-slate-200'
                         }`}
                       >
-                        {/* Mobile-first layout */}
+                        {/* Header row: left icon/title, right primary action */}
                         <div className="flex items-start gap-3 mb-3">
                           <button
                             onClick={() => toggleTask(task.id)}
@@ -1070,68 +1091,92 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
                             )}
                           </button>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start gap-2 mb-2">
+                            <div className="flex items-start gap-2">
                               <task.icon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                               <div className="flex-1 min-w-0">
                                 <h4 className={`text-base sm:text-lg font-medium ${task.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
                                   {task.title}
                                 </h4>
-                                <Badge className={`text-xs mt-1 ${getActionStatusColor(task.status)}`}>
-                                  {task.status.replace('_', ' ')}
-                                </Badge>
                               </div>
                             </div>
-                            <p className="text-sm text-slate-600 mb-3">{task.description}</p>
                           </div>
-                        </div>
-                        
-                        {/* Action button and status buttons - stacked on mobile */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                          {/* Action Button */}
-                          <div className="flex justify-center sm:justify-start">
+                          {/* Primary action button aligned to the top-right */}
+                          <div className="ml-auto hidden sm:block">
                             {(() => {
-                              // Determine the correct href based on task completion and type
                               let href = task.href;
                               if (task.completed && (task.id === "3" || task.id === "4")) {
-                                // Generate Recommendations or Add Recommendations to List when complete
-                                href = "/college-list"; // My Applications page
+                                href = "/college-list";
                               }
-                              
                               if (href.startsWith('http')) {
                                 return (
-                                  <a 
-                                    href={href} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="w-full sm:w-auto"
-                                  >
+                                  <a href={href} target="_blank" rel="noopener noreferrer">
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
                                     >
                                       {task.completed ? 'View' : 'Get Started'}
                                       <ArrowRight className="h-3 w-3 ml-1" />
                                     </Button>
                                   </a>
                                 );
-                              } else {
+                              }
+                              return (
+                                <Link href={href}>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                                  >
+                                    {task.completed ? 'View' : 'Get Started'}
+                                    <ArrowRight className="h-3 w-3 ml-1" />
+                                  </Button>
+                                </Link>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        {/* Description under header */}
+                        <p className="text-sm text-slate-600 mb-3 sm:mb-4">{task.description}</p>
+                        
+                        {/* Status buttons row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          {/* Mobile-only primary action button */}
+                          <div className="sm:hidden">
+                            {(() => {
+                              let href = task.href;
+                              if (task.completed && (task.id === "3" || task.id === "4")) {
+                                href = "/college-list";
+                              }
+                              if (href.startsWith('http')) {
                                 return (
-                                  <Link href={href} className="w-full sm:w-auto">
+                                  <a href={href} target="_blank" rel="noopener noreferrer" className="w-full">
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
                                     >
                                       {task.completed ? 'View' : 'Get Started'}
                                       <ArrowRight className="h-3 w-3 ml-1" />
                                     </Button>
-                                  </Link>
+                                  </a>
                                 );
                               }
+                              return (
+                                <Link href={href} className="w-full">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                                  >
+                                    {task.completed ? 'View' : 'Get Started'}
+                                    <ArrowRight className="h-3 w-3 ml-1" />
+                                  </Button>
+                                </Link>
+                              );
                             })()}
                           </div>
-                          
+
                           {/* Status Override for All Tasks */}
                           <div className="flex gap-1 sm:gap-2 flex-wrap justify-center sm:justify-start">
                             <Button

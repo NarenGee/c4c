@@ -5,11 +5,28 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Menu, X } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function LoginPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const searchParams = useSearchParams()
+  const [urlError, setUrlError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const error = searchParams.get("error")
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        role_creation_failed: "Unable to complete sign-in. Your account may already exist. Please try signing in with your email and password instead.",
+        oauth_failed: "OAuth authentication failed. Please try again.",
+        session_failed: "Failed to establish session. Please try again.",
+        no_code: "Authentication code missing. Please try again.",
+      }
+      setUrlError(errorMessages[error] || "An error occurred during sign-in. Please try again.")
+    }
+  }, [searchParams])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#E5E7E8] via-[#f5f6f7] to-[#E5E7E8]">
@@ -86,6 +103,12 @@ export default function LoginPage() {
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">Sign In</h2>
             <p className="text-slate-600 text-sm sm:text-base">Welcome back to your college coaching portal</p>
           </div>
+
+          {urlError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{urlError}</AlertDescription>
+            </Alert>
+          )}
 
           <Card className="bg-white shadow-lg border-slate-200">
             <CardContent className="p-6 sm:p-8">

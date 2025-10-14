@@ -40,7 +40,10 @@ import {
   CheckCircle,
   Sparkles,
   Users,
-  Trophy
+  Trophy,
+  Save,
+  MessageSquare,
+  ArrowUp
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { generateCollegeRecommendations } from "@/app/actions/college-matching"
@@ -59,6 +62,8 @@ import { OptimizedTextInput } from "@/components/profile/optimized-text-input"
 import React from "react"
 import { FIELD_OPTIONS } from "@/lib/gemini"
 import { getAllColleges } from "@/app/actions/college-list"
+import { UserBasicInfo } from "@/components/profile/user-basic-info"
+import type { User as AuthUser } from "@/lib/auth"
 
 interface StudentProfile {
   grade_level?: string
@@ -758,7 +763,11 @@ const DreamCollegesSection = React.memo(function DreamCollegesSection({
   );
 });
 
-export function ProfileClient() {
+interface ProfileClientProps {
+  user: AuthUser
+}
+
+export function ProfileClient({ user }: ProfileClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -783,6 +792,9 @@ export function ProfileClient() {
   const [allColleges, setAllColleges] = useState<College[]>([]);
   const [collegeSearch, setCollegeSearch] = useState("");
   const [searchInput, setSearchInput] = useState(""); // Controlled input value
+  const [navHidden, setNavHidden] = useState(false)
+  const [showBackToTop, setShowBackToTop] = useState(false)
+  const lastScrollYRef = React.useRef(0)
 
     // console.log('Preferred Countries:', formData.preferredCountries)
 
@@ -913,6 +925,16 @@ export function ProfileClient() {
       if (userInteracted) return // Don't override user clicks
       
       const scrollPosition = window.scrollY + 350 // Offset for sticky header and navigation
+      // Auto-hide sticky nav on scroll direction
+      const currentY = window.scrollY
+      const goingDown = currentY > lastScrollYRef.current
+      if (currentY > 120) {
+        setNavHidden(goingDown)
+      } else {
+        setNavHidden(false)
+      }
+      lastScrollYRef.current = currentY
+      setShowBackToTop(currentY > 600)
       
       // Find which section is currently in view
       const sections = [
@@ -943,6 +965,38 @@ export function ProfileClient() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [userInteracted])
+
+  // Keyboard shortcut: Ctrl+S to save
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        if (!saving) {
+          handleSaveProfile()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [saving])
+
+  // Format navigation label: if exactly two words, break into two lines
+  const renderNavLabel = useCallback((label: string) => {
+    const parts = label.trim().split(/\s+/)
+    if (parts.length === 2) {
+      return (
+        <span className="text-[11px] md:text-xs lg:text-sm text-center leading-tight px-1">
+          <span className="block">{parts[0]}</span>
+          <span className="block">{parts[1]}</span>
+        </span>
+      )
+    }
+    return (
+      <span className="text-[11px] md:text-xs lg:text-sm text-center leading-tight px-1 whitespace-normal break-words">
+        {label}
+      </span>
+    )
+  }, [])
 
   const fuzzyCollegeResults = allColleges || []; // Now backend filtered, with safety check
 
@@ -2070,7 +2124,6 @@ export function ProfileClient() {
       "gradeLevel",
       "countryOfResidence",
       "stateProvince",
-      "intendedMajors",
       "customMajor",
       "gradingSystem",
       "gpa",
@@ -2202,67 +2255,9 @@ export function ProfileClient() {
     <TooltipProvider>
       <div className="space-y-6 sm:space-y-8">
         <div className="max-w-none mx-auto space-y-6 sm:space-y-8">
-          {/* Header Section - Responsive */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <div className="flex-1">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 mb-2">My Profile</h2>
-              <p className="text-slate-600 text-sm sm:text-base lg:text-lg">
-                Complete your academic profile to get personalized college recommendations
-              </p>
-            </div>
-            <div className="flex gap-2 sm:gap-3">
-              <Button 
-                onClick={handleSaveProfile} 
-                disabled={saving}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-sm sm:text-base"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    <span className="hidden sm:inline">Saving...</span>
-                    <span className="sm:hidden">Save</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="hidden sm:inline">Save Profile</span>
-                    <span className="sm:hidden">Save</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
+          {/* Header removed per design request */}
 
-          {/* AI Guidance Assistant Banner - Responsive */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 shadow-lg guidance-banner-pulse">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex items-start lg:items-center gap-3 sm:gap-4">
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-2 sm:p-3 rounded-full shadow-lg flex-shrink-0">
-                  <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-1">Virtual Coach Profile Guidance</h3>
-                  <p className="text-slate-600 text-sm sm:text-base">
-                    Need help with any field? Click the <span className="font-semibold text-blue-600">"Get Guidance"</span> buttons throughout the form for personalized advice from our virtual coach.
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={() => {
-                  setGuidanceOpen(true);
-                  setGuidanceContext("general");
-                  const fieldsOptions = buildProfileFieldsOptionsString();
-                  setGuidancePrompt(
-                    `I'm filling out the My Profile section for my college application. Please give me concise, actionable tips for each of the following fields, focusing only on these fields and their options. If I've already filled out any fields, give advice in context; otherwise, provide general guidance for that field.\n\nThe fields and their options are:\n${fieldsOptions}\n\nOnly give advice for these fields and only suggest from the options listed.`
-                  );
-                }}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-sm sm:text-base w-full lg:w-auto"
-              >
-                <Brain className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Start General Guidance</span>
-                <span className="sm:hidden">Get Guidance</span>
-              </Button>
-            </div>
-          </div>
+          {/* Guidance banner removed per design request */}
 
           {message && (
             <Alert 
@@ -2274,31 +2269,62 @@ export function ProfileClient() {
             </Alert>
           )}
 
-          {/* Elegant Sticky Navigation Menu */}
-          <div className="sticky top-[120px] sm:top-[140px] lg:top-[200px] z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-lg mb-6 sm:mb-8">
+          {/* Elegant Sticky Navigation Menu - auto-hide on scroll */}
+          <div 
+            className={`sticky top-[120px] sm:top-[140px] lg:top-[200px] z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-lg mb-2 sm:mb-3 transition-transform duration-200 ${navHidden ? '-translate-y-[120%]' : 'translate-y-0'}`}
+            role="navigation"
+            aria-label="Profile sections navigation"
+          >
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-              {/* Desktop Navigation - Horizontal Scrollable */}
-              <div className="hidden md:flex items-center justify-center gap-4 lg:gap-6">
-                {sections.map((section) => (
-                  <Button
+              {/* Desktop/Tablet Navigation - Accessibility enhanced (no changes for mobile) */}
+              <div className="relative hidden sm:block">
+                {/* Edge fades for scroll hint (desktop/tablet only) */}
+                <div className="pointer-events-none hidden sm:block absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-white to-transparent"></div>
+                <div className="pointer-events-none hidden sm:block absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-white to-transparent"></div>
+                <div 
+                  className="flex items-center sm:justify-center gap-1.5 md:gap-2 lg:gap-3 overflow-x-auto scrollbar-hide"
+                role="tablist"
+                aria-orientation="horizontal"
+                onKeyDown={(e) => {
+                  // Arrow key navigation between tabs (desktop/tablet only)
+                  const currentIndex = sections.findIndex(s => s.id === activeSection)
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault()
+                    const next = sections[(currentIndex + 1) % sections.length]
+                    scrollToSection(next.id)
+                  }
+                  if (e.key === 'ArrowLeft') {
+                    e.preventDefault()
+                    const prev = sections[(currentIndex - 1 + sections.length) % sections.length]
+                    scrollToSection(prev.id)
+                  }
+                }}
+                >
+                  {sections.map((section) => (
+                    <button
                     key={section.id}
-                    variant="ghost"
+                    role="tab"
+                    aria-selected={activeSection === section.id}
+                    aria-controls={section.id}
+                    tabIndex={activeSection === section.id ? 0 : -1}
                     onClick={() => scrollToSection(section.id)}
-                    className={`relative flex items-center justify-center h-16 px-4 py-3 rounded-xl font-medium transition-all duration-300 w-32 max-w-32 group ${
+                    title={section.label}
+                    className={`relative inline-flex shrink-0 items-center justify-center px-2 md:px-2.5 lg:px-3 py-1 rounded-xl font-medium transition-all duration-300 group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 w-[6.75rem] md:w-[7.5rem] lg:w-[8.5rem] h-10 md:h-11 lg:h-12 ${
                       activeSection === section.id
-                        ? 'bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-lg scale-105'
-                        : 'bg-slate-50 hover:bg-gradient-to-br hover:from-slate-700 hover:to-slate-800 hover:text-white border border-slate-200 hover:border-slate-700 text-slate-700 shadow-sm hover:shadow-lg hover:scale-105'
+                        ? 'bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-lg'
+                        : 'bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-700 shadow-sm'
                     }`}
                   >
-                    <span className="text-sm text-center font-medium leading-tight px-2 whitespace-normal break-words" style={{ wordBreak: 'break-word' }}>{section.label}</span>
-                    {activeSection === section.id && (
-                      <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-blue-500 rounded-full"></div>
-                    )}
-                  </Button>
-                ))}
+                      <span className="[&_span]:text-[10px] md:[&_span]:text-[11px] lg:[&_span]:text-xs leading-tight">{renderNavLabel(section.label)}</span>
+                      {activeSection === section.id && (
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 md:w-6 lg:w-8 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Mobile Navigation - Horizontal Scrollable */}
+              {/* Mobile Navigation - Horizontal Scrollable (unchanged as requested) */}
               <div className="md:hidden">
                 <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide pb-2">
                   {sections.map((section) => (
@@ -2346,10 +2372,64 @@ export function ProfileClient() {
             </div>
           </div>
 
-          <div className="space-y-6 sm:space-y-8 pt-2 sm:pt-4">
+          <div className="space-y-4 sm:space-y-6 pt-0">
+            {/* Floating Actions */}
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+              {/* Chat / Guidance Button */}
+              <Button
+                size="icon"
+                onClick={() => {
+                  setGuidanceOpen(true);
+                  setGuidanceContext("general");
+                  const fieldsOptions = buildProfileFieldsOptionsString();
+                  setGuidancePrompt(
+                    `I'm filling out the My Profile section for my college application. Please give me concise, actionable tips for each of the following fields, focusing only on these fields and their options. If I've already filled out any fields, give advice in context; otherwise, provide general guidance for that field.\n\nThe fields and their options are:\n${fieldsOptions}\n\nOnly give advice for these fields and only suggest from the options listed.`
+                  );
+                }}
+                className="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-900 text-white shadow-lg hover:shadow-xl relative transition-transform duration-200 ease-out hover:scale-105"
+                aria-label="Open guidance chat"
+                title="Open guidance chat"
+              >
+                <MessageSquare className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-purple-600 text-white px-1.5 py-0.5 rounded-full shadow">AI</span>
+              </Button>
+
+              {/* Save Button */}
+              <Button
+                size="icon"
+                onClick={handleSaveProfile}
+                disabled={saving}
+                className="h-12 w-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-transform duration-200 ease-out hover:scale-105"
+                aria-label="Save profile"
+                title="Save profile"
+              >
+                {saving ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Save className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
+
+            {/* Back to Top Button */}
+            {showBackToTop && (
+              <Button
+                size="icon"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className="fixed bottom-6 left-6 h-12 w-12 rounded-full bg-slate-700 hover:bg-slate-800 text-white shadow-lg hover:shadow-xl transition-transform duration-200 ease-out hover:scale-105 z-50"
+                aria-label="Back to top"
+                title="Back to top"
+              >
+                <ArrowUp className="h-5 w-5" />
+              </Button>
+            )}
+
+              {/* User Basic Info Section */}
+              <UserBasicInfo user={user} />
+
               {/* Step 1: Personal Information - Responsive */}
               <div className="relative rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl bg-gradient-to-br from-blue-50 via-white to-blue-100 border border-blue-100 mb-8 sm:mb-12 overflow-visible" id="personal-info">
-                <div className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-8 py-3 sm:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
+          <div className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-8 py-3 sm:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
                   <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-200" />
                   <h3 className="text-lg sm:text-xl lg:text-2xl font-bold tracking-wide">Personal Information</h3>
                 </div>
@@ -2513,7 +2593,9 @@ export function ProfileClient() {
                               <Button type="button" size="icon" variant="ghost" onClick={() => dispatch({ field: 'ibSubjects', value: formData.ibSubjects.filter((_, i) => i !== idx) })} className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 rounded-lg"><X className="w-4 h-4" /></Button>
                             </div>
                           ))}
-                          <Button type="button" size="sm" variant="outline" onClick={addIBSubject} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 rounded-lg px-3 sm:px-4 py-2 mt-2 text-sm sm:text-base">Add IB Subject</Button>
+                          <div className="flex justify-end mt-2">
+                            <Button type="button" size="sm" variant="outline" onClick={addIBSubject} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base">Add IB Subject</Button>
+                          </div>
                             </div>
                             </div>
                     )}
@@ -2687,7 +2769,14 @@ export function ProfileClient() {
                   <div className="space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                         <Label htmlFor="intendedMajors" className="text-slate-700 font-medium text-sm sm:text-base">Intended Majors *</Label>
-                        {renderGuidanceButton("intendedMajors", undefined, "Need help choosing your intended majors? Click for guidance!", true)}
+                        {renderGuidanceButton(
+                          "intendedMajors", 
+                          formData.intendedMajors.length > 0 
+                            ? `I've already selected ${formData.intendedMajors.join(", ")} as my intended majors. Can you help me explore additional options that might complement these choices or suggest alternatives I should consider?`
+                            : "I need help choosing my intended majors. Can you suggest options based on my interests, extracurriculars, and career goals?",
+                          "Need help choosing your intended majors? Click for guidance!", 
+                          true
+                        )}
                     </div>
                       <div className="relative major-dropdown">
                         <button
@@ -2700,7 +2789,7 @@ export function ProfileClient() {
                           <span className={formData.intendedMajors.length === 0 ? 'text-slate-500' : 'text-slate-900'}>
                             {getSelectedMajorsDisplay()}
                           </span>
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-2">
+                          <span className="absolute inset-y-0 right-0 flex items-center justify-center pr-2">
                             <svg className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
@@ -2789,7 +2878,12 @@ export function ProfileClient() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <Label htmlFor="collegeSize" className="text-slate-700 font-medium">Preferred College Size</Label>
-                        {renderGuidanceButton("collegeSize", "I don't know what size college would be right for me.", "Click for help on college size.", true)}
+                        {renderGuidanceButton(
+                          "collegeSize", 
+                          "I'm trying to decide between Small (fewer than 2,000 students), Medium (2,000 to 15,000 students), or Large (more than 15,000 students) colleges. Can you help me understand the differences and what might work best for me?",
+                          "Click for help on college size.", 
+                          true
+                        )}
                     </div>
                       <Select value={formData.collegeSize} onValueChange={(value) => handleFieldChange("collegeSize", value)}>
                         <SelectTrigger><SelectValue placeholder="Select preferred size" /></SelectTrigger>
@@ -2805,7 +2899,12 @@ export function ProfileClient() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <Label htmlFor="campusSetting" className="text-slate-700 font-medium">Campus Setting</Label>
-                        {renderGuidanceButton("campusSetting", undefined, "Need help with campus settings?", true)}
+                        {renderGuidanceButton(
+                          "campusSetting", 
+                          "I'm trying to decide between Urban, Suburban, or Rural campus settings. Can you help me understand the differences and what might work best for me based on my preferences?",
+                          "Need help with campus settings?", 
+                          true
+                        )}
                     </div>
                       <Select value={formData.campusSetting} onValueChange={(value) => handleFieldChange("campusSetting", value)}>
                         <SelectTrigger><SelectValue placeholder="Select preferred setting" /></SelectTrigger>
@@ -2896,7 +2995,12 @@ export function ProfileClient() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <Label className="text-slate-700 font-medium">Cost Importance</Label>
-                        {renderGuidanceButton("costImportance", "How important should cost be in my decision?", "Click for help on cost.", true)}
+                        {renderGuidanceButton(
+                          "costImportance", 
+                          "I'm trying to decide how important cost should be in my college decision. Should I select Very Important, Important, Somewhat Important, or Not Important? Can you help me think through this?",
+                          "Click for help on cost.", 
+                          true
+                        )}
                     </div>
                       <Select value={formData.costImportance} onValueChange={(value) => handleFieldChange("costImportance", value)}>
                         <SelectTrigger className={`h-11 ${missingFields.includes('Cost Importance') ? 'border-red-500' : 'border-slate-300'}`}><SelectValue placeholder="Select importance of cost..." /></SelectTrigger>
@@ -3566,7 +3670,20 @@ export function ProfileClient() {
             initialPrompt={guidancePrompt}
             currentValue={getGuidanceCurrentValue(guidanceContext)}
             countryOfResidence={formData.countryOfResidence}
+            studentProfile={formData}
             onSuggestion={(suggestion) => {
+              console.log('🎯 onSuggestion called:', { guidanceContext, suggestion })
+              
+              // Handle intendedMajors specially (it's an array field)
+              if (guidanceContext === "intendedMajors") {
+                const currentMajors = formData.intendedMajors || []
+                if (!currentMajors.includes(suggestion)) {
+                  dispatch({ field: 'intendedMajors', value: [...currentMajors, suggestion] })
+                }
+                return
+              }
+              
+              // Handle regular string fields
               if (isStringField(guidanceContext as keyof typeof formData)) {
                 handleFieldChange(guidanceContext as keyof typeof formData, suggestion)
               }

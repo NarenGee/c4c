@@ -34,9 +34,11 @@ export function CollegeRecommendationsGuidanceChat({
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(false)
 
   useEffect(() => {
     if (open && messages.length === 0) {
+      setIsInitializing(true)
       const initialPrompt = "Can you help me understand my college recommendations?"
       handleSend(initialPrompt, false)
     }
@@ -76,6 +78,7 @@ export function CollegeRecommendationsGuidanceChat({
       }])
     } finally {
       setIsLoading(false)
+      setIsInitializing(false)
     }
   }
 
@@ -162,8 +165,11 @@ export function CollegeRecommendationsGuidanceChat({
             
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-slate-50 p-4 rounded-2xl mr-4 border border-slate-200">
+                <div className="bg-slate-50 p-4 rounded-2xl mr-4 border border-slate-200 flex items-center gap-3">
                   <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <span className="text-sm text-slate-600">
+                    {isInitializing ? "Analyzing your profile and generating advice..." : "Thinking..."}
+                  </span>
                 </div>
               </div>
             )}

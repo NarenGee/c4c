@@ -37,7 +37,7 @@ export default async function ProfilePage() {
         <div className="bg-gradient-to-br from-[#E5E7E8] via-[#f5f6f7] to-[#E5E7E8] min-h-screen">
           <DashboardHeader user={user} />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
-            <ProfileClient />
+            <ProfileClient user={user} />
           </div>
         </div>
       )
