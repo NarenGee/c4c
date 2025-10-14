@@ -279,7 +279,7 @@ export default function HomePage() {
           <div className="relative z-20 flex flex-col items-center justify-center h-full text-center max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 hero-content">
             <div className="hero-text-container rounded-2xl sm:rounded-3xl p-2 sm:p-3 md:p-4 lg:p-6 mb-4 sm:mb-6 md:mb-8 max-w-5xl w-full">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight mb-4 sm:mb-6 md:mb-8 text-white animate-hero-title hero-title-enhanced">
-                Find Your <span className="text-blue-400">Perfect College Match</span>
+                Find Your<br /><span className="text-blue-400">Perfect College Match</span>
               </h1>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 md:gap-6 animate-hero-subtitle">
                 <div className="process-step bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border border-white/30 hover:bg-gradient-to-br hover:from-white/20 hover:to-white/10 transition-all duration-300 animate-fade-in-up animate-stagger-1">
@@ -708,7 +708,7 @@ export default function HomePage() {
         <section className="py-16 sm:py-20 md:py-24 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-center">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-8 sm:mb-12 text-white">
-              Ready to Find Your <span className="text-blue-300">Perfect College Match</span>?
+              Ready to Find Your<br /><span className="text-blue-300">Perfect College Match</span>?
             </h2>
             <div className="flex justify-center">
               <Link href="/signup">
