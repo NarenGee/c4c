@@ -216,7 +216,7 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
         // Debug logging
         const dreamCount = result.matches.filter(match => match.is_dream_college).length
         const aiCount = result.matches.filter(match => !match.is_dream_college).length
-        console.log(`📊 Loaded matches: ${dreamCount} dream colleges, ${aiCount} AI recommendations`)
+        console.log(`📊 Loaded ${result.matches.length} matches: ${dreamCount} dream colleges, ${aiCount} AI recommendations`)
         
         // Reset dream colleges filter when new data is loaded to show all recommendations
         setFilters((prev: any) => ({
@@ -372,15 +372,9 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
   const filteredMatches = () => {
     let filtered = matches
 
-    // Debug logging
-    console.log(`🔍 Filtering ${matches.length} total matches`)
-    console.log(`🔍 Active tab: ${activeTab}`)
-    console.log(`🔍 Show dream colleges filter: ${filters.showDreamColleges}`)
-
     // Apply tab filter
     if (activeTab !== "all") {
       filtered = filtered.filter(match => match.fit_category === activeTab)
-      console.log(`🔍 After tab filter: ${filtered.length} matches`)
     }
 
     // Apply admission chance filter
@@ -433,9 +427,24 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
 
     // Apply annual cost filter
     filtered = filtered.filter(match => {
-      if (!match.estimated_cost && !match.tuition_annual) return true
+      if (!match.estimated_cost && !match.tuition_annual) {
+        return true
+      }
       const costStr = match.estimated_cost || match.tuition_annual || "0"
-      const cost = parseInt(costStr.replace(/[^0-9]/g, "")) || 0
+      
+      // Handle cost ranges like "$10,000-$12,000" or "$45,000-$50,000"
+      // Extract the first number (lower bound of the range)
+      let cost = 0
+      
+      // If there's a dash, split and take the first part
+      if (costStr.includes('-')) {
+        const firstPart = costStr.split('-')[0].trim()
+        cost = parseInt(firstPart.replace(/[^0-9]/g, "")) || 0
+      } else {
+        // No dash, just extract all digits
+        cost = parseInt(costStr.replace(/[^0-9]/g, "")) || 0
+      }
+      
       return cost >= filters.annualCostRange[0] && cost <= filters.annualCostRange[1]
     })
 
@@ -451,7 +460,6 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
     // Apply dream college filter
     if (filters.showDreamColleges) {
       filtered = filtered.filter(match => match.is_dream_college === true)
-      console.log(`🔍 After dream colleges filter: ${filtered.length} matches`)
     }
 
     // Apply sorting
@@ -472,15 +480,20 @@ export function CollegeMatchesView({ refreshTrigger }: CollegeMatchesViewProps) 
           if (!a.student_count || !b.student_count) return 0
           return b.student_count - a.student_count
         case "annualCost":
-          const costA = parseInt((a.estimated_cost || a.tuition_annual || "0").replace(/[^0-9]/g, "")) || 0
-          const costB = parseInt((b.estimated_cost || b.tuition_annual || "0").replace(/[^0-9]/g, "")) || 0
-          return costA - costB
+          const getCost = (match: CollegeMatch) => {
+            const costStr = match.estimated_cost || match.tuition_annual || "0"
+            if (costStr.includes('-')) {
+              const firstPart = costStr.split('-')[0].trim()
+              return parseInt(firstPart.replace(/[^0-9]/g, "")) || 0
+            }
+            return parseInt(costStr.replace(/[^0-9]/g, "")) || 0
+          }
+          return getCost(a) - getCost(b)
         default:
           return 0
       }
     })
 
-    console.log(`🔍 Final filtered results: ${filtered.length} matches`)
     return filtered
   }
 

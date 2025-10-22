@@ -83,65 +83,65 @@ export default function SuperAdminSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-3 sm:p-4 md:p-6">
       <Card className="w-full max-w-md mx-auto border-slate-700 bg-slate-800/50 backdrop-blur-sm">
-        <CardHeader className="text-center pb-6">
-          <div className="mx-auto mb-4 p-3 rounded-full bg-red-100">
-            <Shield className="h-8 w-8 text-red-600" />
+        <CardHeader className="text-center pb-4 md:pb-6 px-4 md:px-6">
+          <div className="mx-auto mb-3 md:mb-4 p-2 md:p-3 rounded-full bg-red-100">
+            <Shield className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white">
+          <CardTitle className="text-xl md:text-2xl font-bold text-white">
             Super Admin Access
           </CardTitle>
-          <CardDescription className="text-slate-300">
+          <CardDescription className="text-sm md:text-base text-slate-300">
             Create a super administrator account with elevated privileges
           </CardDescription>
         </CardHeader>
         
-        <CardContent>
+        <CardContent className="px-4 md:px-6">
           {error && (
-            <Alert className="mb-6 border-red-600 bg-red-900/50">
-              <AlertDescription className="text-red-200">
+            <Alert className="mb-4 md:mb-6 border-red-600 bg-red-900/50">
+              <AlertDescription className="text-xs md:text-sm text-red-200">
                 {error}
               </AlertDescription>
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-slate-200">Full Name</Label>
+              <Label htmlFor="fullName" className="text-sm text-slate-200">Full Name</Label>
               <Input
                 id="fullName"
                 type="text"
                 placeholder="Administrator Name"
                 value={formData.fullName}
                 onChange={(e) => handleInputChange("fullName", e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 text-sm md:text-base"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-200">Email</Label>
+              <Label htmlFor="email" className="text-sm text-slate-200">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="admin@organization.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 text-sm md:text-base"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="adminCode" className="text-slate-200">Admin Authorization Code</Label>
+              <Label htmlFor="adminCode" className="text-sm text-slate-200">Admin Authorization Code</Label>
               <Input
                 id="adminCode"
                 type="password"
                 placeholder="Enter admin code"
                 value={formData.adminCode}
                 onChange={(e) => handleInputChange("adminCode", e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 text-sm md:text-base"
                 required
               />
               <p className="text-xs text-slate-400">
@@ -150,7 +150,7 @@ export default function SuperAdminSignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-200">Password</Label>
+              <Label htmlFor="password" className="text-sm text-slate-200">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -158,14 +158,14 @@ export default function SuperAdminSignupPage() {
                   placeholder="Create a secure password"
                   value={formData.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
-                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 pr-10"
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 pr-10 text-sm md:text-base"
                   required
                   minLength={12}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -176,29 +176,29 @@ export default function SuperAdminSignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-slate-200">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-sm text-slate-200">Confirm Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 placeholder="Confirm your password"
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 text-sm md:text-base"
                 required
               />
             </div>
 
             <Button 
               type="submit" 
-              className="w-full bg-red-600 hover:bg-red-700 text-white" 
+              className="w-full bg-red-600 hover:bg-red-700 text-white text-sm md:text-base" 
               disabled={loading}
             >
               {loading ? "Creating Account..." : "Create Super Admin Account"}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-400">
+          <div className="mt-4 md:mt-6 text-center">
+            <p className="text-xs md:text-sm text-slate-400">
               Regular user?{" "}
               <a href="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
                 Sign up here

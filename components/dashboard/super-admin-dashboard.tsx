@@ -230,18 +230,18 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8 px-4 md:px-6">
       {/* Header */}
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold text-slate-800">Super Admin Dashboard</h1>
-        <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+      <div className="text-center space-y-2 md:space-y-4">
+        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-800">Super Admin Dashboard</h1>
+        <p className="text-sm md:text-base lg:text-lg text-slate-600 max-w-2xl mx-auto px-4">
           Manage users, coach assignments, and system-wide settings.
         </p>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex justify-center">
-        <div className="bg-white rounded-lg shadow-sm border p-1 flex space-x-1">
+      <div className="flex justify-center overflow-x-auto pb-2">
+        <div className="bg-white rounded-lg shadow-sm border p-1 flex space-x-1 min-w-fit">
           {[
             { id: 'overview', label: 'Overview', icon: Shield },
             { id: 'users', label: 'User Management', icon: Users },
@@ -252,14 +252,15 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
+                className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-blue-600 text-white'
                     : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
                 }`}
               >
-                <Icon className="h-4 w-4" />
-                {tab.label}
+                <Icon className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.id === 'overview' ? 'Overview' : tab.id === 'users' ? 'Users' : 'Assignments'}</span>
               </button>
             )
           })}
@@ -268,9 +269,9 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Stats Cards */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="border-0 shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -321,26 +322,26 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
 
       {/* Users Tab */}
       {activeTab === 'users' && (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-slate-800">User Management</CardTitle>
-              <CardDescription>View and manage all system users</CardDescription>
+              <CardTitle className="text-base md:text-lg text-slate-800">User Management</CardTitle>
+              <CardDescription className="text-sm">View and manage all system users</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search and Filter */}
-              <div className="flex gap-4 items-center">
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search users by name or email..."
+                    placeholder="Search users..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
                 </div>
                 <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Filter by role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -355,16 +356,16 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
               </div>
 
               {/* Users Table */}
-              <div className="border rounded-lg">
+              <div className="border rounded-lg overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Organization</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="min-w-[200px]">User</TableHead>
+                      <TableHead className="min-w-[100px]">Role</TableHead>
+                      <TableHead className="hidden md:table-cell min-w-[150px]">Organization</TableHead>
+                      <TableHead className="hidden lg:table-cell min-w-[100px]">Joined</TableHead>
+                      <TableHead className="min-w-[80px]">Status</TableHead>
+                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -372,28 +373,28 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                       <TableRow key={user.id}>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{user.full_name}</div>
-                            <div className="text-sm text-slate-500">{user.email}</div>
+                            <div className="font-medium text-sm">{user.full_name}</div>
+                            <div className="text-xs text-slate-500">{user.email}</div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="capitalize">
+                          <Badge variant="outline" className="capitalize text-xs">
                             {user.current_role?.replace('_', ' ') || 'No role'}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {user.organization || <span className="text-slate-400">-</span>}
+                        <TableCell className="hidden md:table-cell">
+                          <span className="text-sm">{user.organization || <span className="text-slate-400">-</span>}</span>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className="text-sm">{new Date(user.created_at).toLocaleDateString()}</span>
                         </TableCell>
                         <TableCell>
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={user.is_active ? "default" : "secondary"}>
+                          <Badge variant={user.is_active ? "default" : "secondary"} className="text-xs">
                             {user.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
+                          <div className="flex gap-1 md:gap-2 justify-end">
                             <Button size="sm" variant="outline" onClick={() => handleEditUser(user)}>
                               <Edit className="h-3 w-3" />
                             </Button>
@@ -414,17 +415,17 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
 
       {/* Assignments Tab */}
       {activeTab === 'assignments' && (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-slate-800">Coach-Student Assignments</CardTitle>
-              <CardDescription>Manage which coaches are assigned to which students</CardDescription>
+              <CardTitle className="text-base md:text-lg text-slate-800">Coach-Student Assignments</CardTitle>
+              <CardDescription className="text-sm">Manage which coaches are assigned to which students</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                 <Input
                   placeholder="Search assignments..."
-                  className="max-w-sm"
+                  className="w-full sm:max-w-sm"
                 />
                 <AssignmentModal onAssignmentCreated={loadData} />
               </div>
@@ -434,14 +435,15 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                 {Object.values(groupedAssignments).map((group) => (
                   <Card key={group.coach.id} className="border-0 shadow-lg">
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg text-slate-800">{group.coach.name}</CardTitle>
-                          <CardDescription className="text-sm">
-                            {group.coach.email} • {group.coach.organization || 'No Organization'}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex-1">
+                          <CardTitle className="text-base md:text-lg text-slate-800">{group.coach.name}</CardTitle>
+                          <CardDescription className="text-xs md:text-sm">
+                            <div className="break-all">{group.coach.email}</div>
+                            <div>{group.coach.organization || 'No Organization'}</div>
                           </CardDescription>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                           <div className="text-sm font-medium text-slate-600">
                             {group.students.length} Student{group.students.length !== 1 ? 's' : ''}
                           </div>
@@ -454,22 +456,24 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                     <CardContent className="pt-0">
                       <div className="space-y-3">
                         {group.students.map((student) => (
-                          <div key={student.assignment_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
+                          <div key={student.assignment_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-col gap-2">
                                 <div className="flex-1">
-                                  <div className="font-medium text-slate-800">{student.name}</div>
-                                  <div className="text-sm text-slate-500">{student.email}</div>
+                                  <div className="font-medium text-sm text-slate-800">{student.name}</div>
+                                  <div className="text-xs text-slate-500 break-all">{student.email}</div>
                                 </div>
-                                <div className="text-sm text-slate-600">
-                                  Assigned: {new Date(student.assigned_at).toLocaleDateString()}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="text-xs text-slate-600">
+                                    Assigned: {new Date(student.assigned_at).toLocaleDateString()}
+                                  </div>
+                                  <Badge variant={student.is_active ? "default" : "secondary"} className="text-xs">
+                                    {student.is_active ? "Active" : "Inactive"}
+                                  </Badge>
                                 </div>
-                                <Badge variant={student.is_active ? "default" : "secondary"}>
-                                  {student.is_active ? "Active" : "Inactive"}
-                                </Badge>
                               </div>
                             </div>
-                            <div className="flex gap-2 ml-4">
+                            <div className="flex gap-2 sm:ml-4">
                               <Button size="sm" variant="outline">
                                 <Edit className="h-3 w-3" />
                               </Button>
@@ -484,7 +488,7 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                   </Card>
                 ))}
                 {Object.keys(groupedAssignments).length === 0 && (
-                  <div className="text-center text-slate-500 py-8">
+                  <div className="text-center text-slate-500 py-8 text-sm">
                     No coach-student assignments found.
                   </div>
                 )}
@@ -497,43 +501,43 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
 
       {/* Edit User Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base md:text-lg">Edit User</DialogTitle>
+            <DialogDescription className="text-sm">
               Make changes to the user profile here. Click save when you're done.
             </DialogDescription>
           </DialogHeader>
           {editingUser && (
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                <Label htmlFor="name" className="sm:text-right">
                   Name
                 </Label>
                 <Input
                   id="name"
                   defaultValue={editingUser.full_name || ""}
-                  className="col-span-3"
+                  className="sm:col-span-3"
                   onChange={(e) => {
                     setEditingUser({...editingUser, full_name: e.target.value})
                   }}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                <Label htmlFor="email" className="sm:text-right">
                   Email
                 </Label>
                 <Input
                   id="email"
                   defaultValue={editingUser.email || ""}
-                  className="col-span-3"
+                  className="sm:col-span-3"
                   onChange={(e) => {
                     setEditingUser({...editingUser, email: e.target.value})
                   }}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="role" className="text-right">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                <Label htmlFor="role" className="sm:text-right">
                   Role
                 </Label>
                 <Select 
@@ -542,7 +546,7 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                     setEditingUser({...editingUser, current_role: value as any})
                   }}
                 >
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger className="sm:col-span-3">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -554,15 +558,15 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="organization" className="text-right">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                <Label htmlFor="organization" className="sm:text-right">
                   Organization
                 </Label>
                 <Input
                   id="organization"
                   defaultValue={editingUser.organization || ""}
                   placeholder="Enter organization name"
-                  className="col-span-3"
+                  className="sm:col-span-3"
                   onChange={(e) => {
                     setEditingUser({...editingUser, organization: e.target.value})
                   }}
@@ -570,8 +574,8 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setEditModalOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
             <Button onClick={() => {
@@ -583,7 +587,7 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
                   organization: editingUser.organization
                 })
               }
-            }}>
+            }} className="w-full sm:w-auto">
               Save changes
             </Button>
           </DialogFooter>
@@ -594,23 +598,23 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base md:text-lg">Delete User</DialogTitle>
+            <DialogDescription className="text-sm">
               Are you sure you want to delete this user? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {deletingUser && (
             <div className="py-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 md:p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                      <Trash2 className="h-5 w-5 text-red-600" />
+                    <div className="w-8 h-8 md:w-10 md:h-10 bg-red-100 rounded-full flex items-center justify-center">
+                      <Trash2 className="h-4 w-4 md:h-5 md:w-5 text-red-600" />
                     </div>
                   </div>
-                  <div>
-                    <div className="font-medium text-red-900">{deletingUser.full_name || 'Unknown User'}</div>
-                    <div className="text-sm text-red-700">{deletingUser.email}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm md:text-base text-red-900 break-words">{deletingUser.full_name || 'Unknown User'}</div>
+                    <div className="text-xs md:text-sm text-red-700 break-all">{deletingUser.email}</div>
                     <div className="text-xs text-red-600 mt-1">
                       Role: {deletingUser.current_role?.replace('_', ' ') || 'No role'}
                     </div>
@@ -619,11 +623,11 @@ export function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmDeleteUser}>
+            <Button variant="destructive" onClick={confirmDeleteUser} className="w-full sm:w-auto">
               Delete User
             </Button>
           </DialogFooter>

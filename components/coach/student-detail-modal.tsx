@@ -489,28 +489,44 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden bg-slate-50">
-        <DialogHeader className="bg-slate-800 text-white -mx-6 -mt-6 px-6 py-4">
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <GraduationCap className="h-6 w-6" />
-            {studentName} - Student Profile
+      <DialogContent className="max-w-[95vw] sm:max-w-6xl max-h-[90vh] overflow-hidden bg-slate-50 p-0">
+        <DialogHeader className="bg-slate-800 text-white px-4 sm:px-6 py-4">
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6" />
+            <span className="truncate">{studentName} - Student Profile</span>
           </DialogTitle>
-          <DialogDescription className="text-slate-300">
-            Comprehensive view of student profile and college application progress
+          <DialogDescription className="text-slate-300 text-sm sm:text-base">
+            <span className="hidden sm:inline">Comprehensive view of student profile and college application progress</span>
+            <span className="sm:hidden">Student profile and application progress</span>
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="h-[calc(90vh-120px)] px-6 py-4">
+        <ScrollArea className="h-[calc(90vh-120px)] px-4 sm:px-6 py-4">
           {loading ? (
             <div className="text-center py-8">Loading student data...</div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-6">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="profile">Student Profile</TabsTrigger>
-                <TabsTrigger value="preferences">College Preferences</TabsTrigger>
-                <TabsTrigger value="matches">College Recommendations</TabsTrigger>
-                <TabsTrigger value="applications">Applications ({applications.length})</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 mb-6 h-auto">
+                <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden sm:inline">Overview</span>
+                  <span className="sm:hidden">Overview</span>
+                </TabsTrigger>
+                <TabsTrigger value="profile" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden sm:inline">Student Profile</span>
+                  <span className="sm:hidden">Profile</span>
+                </TabsTrigger>
+                <TabsTrigger value="preferences" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden sm:inline">College Preferences</span>
+                  <span className="sm:hidden">Preferences</span>
+                </TabsTrigger>
+                <TabsTrigger value="matches" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden sm:inline">College Recommendations</span>
+                  <span className="sm:hidden">Matches</span>
+                </TabsTrigger>
+                <TabsTrigger value="applications" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden sm:inline">Applications ({applications.length})</span>
+                  <span className="sm:hidden">Apps ({applications.length})</span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
@@ -917,17 +933,18 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
               </TabsContent>
 
               <TabsContent value="matches" className="space-y-4">
-                <Card className="border-0 shadow-lg">
+                <Card className="border-0 shadow-lg w-full overflow-hidden">
                   <CardHeader className="bg-slate-800 text-white border-b">
-                    <CardTitle className="text-white flex items-center gap-2">
-                      <Target className="h-5 w-5" />
-                      College Recommendations
+                    <CardTitle className="text-white flex items-center gap-2 text-lg sm:text-xl">
+                      <Target className="h-5 w-5 flex-shrink-0" />
+                      <span className="truncate">College Recommendations</span>
                     </CardTitle>
-                    <CardDescription className="text-slate-300">
-                      Comprehensive view of AI-generated recommendations and student's dream colleges with detailed analysis
+                    <CardDescription className="text-slate-300 text-sm sm:text-base">
+                      <span className="hidden sm:inline">Comprehensive view of AI-generated recommendations and student's dream colleges with detailed analysis</span>
+                      <span className="sm:hidden">AI recommendations and dream colleges with detailed analysis</span>
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-6">
+                  <CardContent className="p-4 sm:p-6 overflow-hidden">
                     {matches.length > 0 ? (
                       <div className="space-y-6">
                         {/* Student Profile Context */}
@@ -937,7 +954,7 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
                               <Info className="h-4 w-4 text-blue-600" />
                               Student Profile Context
                             </h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                               <div>
                                 <span className="font-medium text-slate-700">Academic:</span>
                                 <div className="text-slate-600">
@@ -972,41 +989,43 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
 
                         {/* Filters and Controls */}
                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                          <div className="flex items-center gap-4 flex-wrap">
+                          <div className="space-y-4">
                             <div className="flex items-center gap-2">
                               <Filter className="h-4 w-4 text-slate-600" />
                               <span className="font-medium text-slate-700">Filters:</span>
                             </div>
                             
-                            {/* Search */}
-                            <div className="relative">
-                              <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                              <Input
-                                placeholder="Search colleges..."
-                                value={matchFilters.searchTerm}
-                                onChange={(e) => setMatchFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
-                                className="pl-10 w-48"
-                              />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                              {/* Search */}
+                              <div className="relative">
+                                <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                                <Input
+                                  placeholder="Search colleges..."
+                                  value={matchFilters.searchTerm}
+                                  onChange={(e) => setMatchFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
+                                  className="pl-10 w-full"
+                                />
+                              </div>
+
+                              {/* Sort By */}
+                              <Select
+                                value={matchFilters.sortBy}
+                                onValueChange={(value) => setMatchFilters(prev => ({ ...prev, sortBy: value }))}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Sort by" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="match_score">Match Score</SelectItem>
+                                  <SelectItem value="admission_chance">Admission Chance</SelectItem>
+                                  <SelectItem value="college_name">College Name</SelectItem>
+                                  <SelectItem value="fit_category">Fit Category</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
 
-                            {/* Sort By */}
-                            <Select
-                              value={matchFilters.sortBy}
-                              onValueChange={(value) => setMatchFilters(prev => ({ ...prev, sortBy: value }))}
-                            >
-                              <SelectTrigger className="w-40">
-                                <SelectValue placeholder="Sort by" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="match_score">Match Score</SelectItem>
-                                <SelectItem value="admission_chance">Admission Chance</SelectItem>
-                                <SelectItem value="college_name">College Name</SelectItem>
-                                <SelectItem value="fit_category">Fit Category</SelectItem>
-                              </SelectContent>
-                            </Select>
-
                             {/* Type Filters */}
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                               <div className="flex items-center space-x-2">
                                 <Checkbox
                                   id="dreamColleges"
@@ -1036,80 +1055,85 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
                         {/* Colleges List */}
                         <div className="space-y-4">
                           {getFilteredAndSortedMatches().map((match) => (
-                            <Card key={match.id} className="border border-slate-200 shadow-sm">
-                              <CardContent className="p-0">
+                            <Card key={match.id} className="border border-slate-200 shadow-sm w-full overflow-hidden">
+                              <CardContent className="p-0 overflow-hidden">
                                 {/* College Header */}
-                                <div className="p-4 border-b border-slate-100">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-3 mb-2">
-                                        <h4 className="text-lg font-semibold text-slate-800">{match.college_name}</h4>
-                                        <div className="flex items-center gap-2">
-                                          {match.is_dream_college && (
-                                            <Badge className="bg-red-100 text-red-800 border-red-200">
-                                              <Heart className="h-3 w-3 mr-1" />
-                                              Dream College
-                                            </Badge>
-                                          )}
-                                          {match.fit_category && (
-                                            <Badge variant="outline" className={`${
-                                              match.fit_category === 'Safety' ? 'bg-green-50 text-green-700 border-green-200' :
-                                              match.fit_category === 'Target' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                              'bg-orange-50 text-orange-700 border-orange-200'
-                                            }`}>
-                                              {match.fit_category}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      </div>
-                                      
-                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                        <div className="flex items-center gap-2">
-                                          <BarChart3 className="h-4 w-4 text-blue-600" />
-                                          <span className="text-slate-600">
-                                            Match: <span className="font-medium">{Math.round(match.match_score * 100)}%</span>
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <TrendingUp className="h-4 w-4 text-green-600" />
-                                          <span className="text-slate-600">
-                                            Admission: <span className="font-medium">{Math.round(match.admission_chance * 100)}%</span>
-                                          </span>
-                                        </div>
-                                        {match.city && match.country && (
-                                          <div className="flex items-center gap-2">
-                                            <MapPin className="h-4 w-4 text-purple-600" />
-                                            <span className="text-slate-600">{match.city}, {match.country}</span>
-                                          </div>
+                                <div className="p-3 sm:p-4 border-b border-slate-100">
+                                  <div className="space-y-3">
+                                    {/* College Name and Badges */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                      <h4 className="text-lg font-semibold text-slate-800 truncate flex-1">{match.college_name}</h4>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        {match.is_dream_college && (
+                                          <Badge className="bg-red-100 text-red-800 border-red-200 text-xs">
+                                            <Heart className="h-3 w-3 mr-1" />
+                                            <span className="hidden sm:inline">Dream College</span>
+                                            <span className="sm:hidden">Dream</span>
+                                          </Badge>
                                         )}
-                                        {match.estimated_cost && (
-                                          <div className="flex items-center gap-2">
-                                            <DollarSign className="h-4 w-4 text-orange-600" />
-                                            <span className="text-slate-600">{match.estimated_cost}</span>
-                                          </div>
+                                        {match.fit_category && (
+                                          <Badge variant="outline" className={`text-xs ${
+                                            match.fit_category === 'Safety' ? 'bg-green-50 text-green-700 border-green-200' :
+                                            match.fit_category === 'Target' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                            'bg-orange-50 text-orange-700 border-orange-200'
+                                          }`}>
+                                            {match.fit_category}
+                                          </Badge>
                                         )}
                                       </div>
                                     </div>
                                     
-                                    {/* Expand Button */}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => toggleMatchExpansion(match.id)}
-                                      className="flex items-center gap-2 hover:bg-slate-50"
-                                    >
-                                      {expandedMatches.has(match.id) ? (
-                                        <>
-                                          <ChevronUp className="h-4 w-4" />
-                                          Show Less
-                                        </>
-                                      ) : (
-                                        <>
-                                          <ChevronDown className="h-4 w-4" />
-                                          See Details
-                                        </>
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <BarChart3 className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                        <span className="text-slate-600">
+                                          <span className="hidden sm:inline">Match: </span><span className="font-medium">{Math.round(match.match_score * 100)}%</span>
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <TrendingUp className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                        <span className="text-slate-600">
+                                          <span className="hidden sm:inline">Admission: </span><span className="font-medium">{Math.round(match.admission_chance * 100)}%</span>
+                                        </span>
+                                      </div>
+                                      {match.city && match.country && (
+                                        <div className="flex items-center gap-2">
+                                          <MapPin className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                                          <span className="text-slate-600 truncate">{match.city}, {match.country}</span>
+                                        </div>
                                       )}
-                                    </Button>
+                                      {match.estimated_cost && (
+                                        <div className="flex items-center gap-2">
+                                          <DollarSign className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                                          <span className="text-slate-600">{match.estimated_cost}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Expand Button */}
+                                    <div className="flex justify-end">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => toggleMatchExpansion(match.id)}
+                                        className="flex items-center gap-2 hover:bg-slate-50 w-full sm:w-auto"
+                                      >
+                                        {expandedMatches.has(match.id) ? (
+                                          <>
+                                            <ChevronUp className="h-4 w-4" />
+                                            <span className="hidden sm:inline">Show Less</span>
+                                            <span className="sm:hidden">Show Less</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <ChevronDown className="h-4 w-4" />
+                                            <span className="hidden sm:inline">See Details</span>
+                                            <span className="sm:hidden">See Details</span>
+                                          </>
+                                        )}
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
 

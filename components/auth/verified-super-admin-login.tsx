@@ -122,10 +122,10 @@ export function VerifiedSuperAdminLogin() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       {error && (
         <Alert className="border-red-600 bg-red-900/50">
-          <AlertDescription className="text-red-200">
+          <AlertDescription className="text-xs md:text-sm text-red-200">
             {error}
           </AlertDescription>
         </Alert>
@@ -133,29 +133,29 @@ export function VerifiedSuperAdminLogin() {
 
       {status && !error && (
         <Alert className="border-blue-600 bg-blue-900/50">
-          <AlertDescription className="text-blue-200">
+          <AlertDescription className="text-xs md:text-sm text-blue-200">
             {status}
           </AlertDescription>
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="verified-email" className="text-slate-200">Email</Label>
+          <Label htmlFor="verified-email" className="text-sm text-slate-200">Email</Label>
           <Input
             id="verified-email"
             type="email"
             placeholder="your-email@example.com"
             value={formData.email}
             onChange={(e) => handleInputChange("email", e.target.value)}
-            className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+            className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 text-sm md:text-base"
             required
             autoComplete="username"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="verified-password" className="text-slate-200">Password</Label>
+          <Label htmlFor="verified-password" className="text-sm text-slate-200">Password</Label>
           <div className="relative">
             <Input
               id="verified-password"
@@ -163,14 +163,14 @@ export function VerifiedSuperAdminLogin() {
               placeholder="Enter your password"
               value={formData.password}
               onChange={(e) => handleInputChange("password", e.target.value)}
-              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 pr-10"
+              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 pr-10 text-sm md:text-base"
               required
               autoComplete="current-password"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3 text-slate-400 hover:text-slate-300"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -179,14 +179,14 @@ export function VerifiedSuperAdminLogin() {
 
         <Button 
           type="submit" 
-          className="w-full bg-red-600 hover:bg-red-700 text-white" 
+          className="w-full bg-red-600 hover:bg-red-700 text-white text-sm md:text-base" 
           disabled={loading}
         >
           {loading ? "Processing..." : "Access Super Admin Portal"}
         </Button>
       </form>
 
-      <div className="mt-4 text-center">
+      <div className="mt-3 md:mt-4 text-center">
         <p className="text-xs text-slate-400">
           Verified super admin login with role switching and access verification.
         </p>
@@ -194,6 +194,9 @@ export function VerifiedSuperAdminLogin() {
     </div>
   )
 }
+
+
+
 
 
 

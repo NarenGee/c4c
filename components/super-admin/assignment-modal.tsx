@@ -187,23 +187,24 @@ export function AssignmentModal({ onAssignmentCreated }: AssignmentModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="flex items-center gap-2">
+        <Button className="flex items-center gap-2 text-sm">
           <Plus className="h-4 w-4" />
-          New Assignment
+          <span className="hidden sm:inline">New Assignment</span>
+          <span className="sm:hidden">New</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Coach-Student Assignments</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-base md:text-lg">Create Coach-Student Assignments</DialogTitle>
+          <DialogDescription className="text-sm">
             Assign multiple students to a coach for personalized guidance.
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
           {/* Coach Selection */}
           <div className="space-y-2">
-            <Label htmlFor="coach">Select Coach</Label>
+            <Label htmlFor="coach" className="text-sm">Select Coach</Label>
             <div className="space-y-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -211,19 +212,19 @@ export function AssignmentModal({ onAssignmentCreated }: AssignmentModalProps) {
                   placeholder="Search coaches..."
                   value={coachSearch}
                   onChange={(e) => setCoachSearch(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 text-sm"
                 />
               </div>
               <Select value={selectedCoach} onValueChange={setSelectedCoach}>
-                <SelectTrigger>
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="Choose a coach" />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredCoaches.map((coach) => (
                     <SelectItem key={coach.id} value={coach.id}>
                       <div className="flex flex-col">
-                        <span className="font-medium">{coach.full_name}</span>
-                        <span className="text-xs text-slate-500">{coach.email}</span>
+                        <span className="font-medium text-sm">{coach.full_name}</span>
+                        <span className="text-xs text-slate-500 break-all">{coach.email}</span>
                         {coach.organization && (
                           <span className="text-xs text-slate-400">{coach.organization}</span>
                         )}
@@ -238,50 +239,52 @@ export function AssignmentModal({ onAssignmentCreated }: AssignmentModalProps) {
           {/* Already Assigned Students */}
           {selectedCoach && (
             <div className="space-y-2">
-              <Label>Already Assigned Students</Label>
+              <Label className="text-sm">Already Assigned Students</Label>
               {loadingAssignments ? (
-                <div className="text-sm text-slate-500 py-2">Loading existing assignments...</div>
+                <div className="text-xs md:text-sm text-slate-500 py-2">Loading existing assignments...</div>
               ) : alreadyAssignedStudents.length > 0 ? (
                 <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-2 bg-slate-50">
                   {alreadyAssignedStudents.map((student) => (
                     <div key={student.id} className="flex items-center space-x-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full"></div>
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex flex-col">
-                          <span className="font-medium text-sm text-green-800">{student.full_name}</span>
-                          <span className="text-xs text-green-600">{student.email}</span>
+                          <span className="font-medium text-xs md:text-sm text-green-800 truncate">{student.full_name}</span>
+                          <span className="text-xs text-green-600 break-all">{student.email}</span>
                         </div>
                       </div>
-                      <div className="text-xs text-green-600 font-medium">Assigned</div>
+                      <div className="text-xs text-green-600 font-medium whitespace-nowrap">Assigned</div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-slate-500 py-2">No students currently assigned to this coach.</div>
+                <div className="text-xs md:text-sm text-slate-500 py-2">No students currently assigned to this coach.</div>
               )}
             </div>
           )}
 
           {/* Student Selection */}
           <div className="space-y-2">
-            <Label htmlFor="students">Select Students ({selectedStudents.length} selected, {filteredStudents.length} available)</Label>
+            <Label htmlFor="students" className="text-sm">
+              Select Students ({selectedStudents.length} selected, {filteredStudents.length} available)
+            </Label>
             
             {/* Selected Students Display */}
             {selectedStudents.length > 0 && (
               <div className="space-y-2">
-                <div className="text-sm font-medium text-slate-700">Selected Students:</div>
-                <div className="flex flex-wrap gap-2">
+                <div className="text-xs md:text-sm font-medium text-slate-700">Selected Students:</div>
+                <div className="flex flex-wrap gap-1.5 md:gap-2">
                   {selectedStudents.map((studentId) => {
                     const student = students.find(s => s.id === studentId)
                     return (
-                      <div key={studentId} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm">
-                        <span>{student?.full_name}</span>
+                      <div key={studentId} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-xs md:text-sm">
+                        <span className="truncate max-w-[150px]">{student?.full_name}</span>
                         <button
                           type="button"
                           onClick={() => removeStudent(studentId)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-blue-600 hover:text-blue-800 flex-shrink-0"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -294,34 +297,38 @@ export function AssignmentModal({ onAssignmentCreated }: AssignmentModalProps) {
 
             {/* Student Search and Selection */}
             <div className="space-y-2">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="Search students..."
                     value={studentSearch}
                     onChange={(e) => setStudentSearch(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 text-sm"
                   />
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={selectAllFilteredStudents}
-                  disabled={filteredStudents.length === 0}
-                >
-                  Select All
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearAllStudents}
-                  disabled={selectedStudents.length === 0}
-                >
-                  Clear
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={selectAllFilteredStudents}
+                    disabled={filteredStudents.length === 0}
+                    className="flex-1 sm:flex-none text-xs md:text-sm"
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={clearAllStudents}
+                    disabled={selectedStudents.length === 0}
+                    className="flex-1 sm:flex-none text-xs md:text-sm"
+                  >
+                    Clear
+                  </Button>
+                </div>
               </div>
               
               {/* Student List with Checkboxes */}
@@ -332,17 +339,18 @@ export function AssignmentModal({ onAssignmentCreated }: AssignmentModalProps) {
                       id={student.id}
                       checked={selectedStudents.includes(student.id)}
                       onCheckedChange={() => handleStudentToggle(student.id)}
+                      className="flex-shrink-0"
                     />
-                    <label htmlFor={student.id} className="flex-1 cursor-pointer">
+                    <label htmlFor={student.id} className="flex-1 cursor-pointer min-w-0">
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm">{student.full_name}</span>
-                        <span className="text-xs text-slate-500">{student.email}</span>
+                        <span className="font-medium text-xs md:text-sm truncate">{student.full_name}</span>
+                        <span className="text-xs text-slate-500 break-all">{student.email}</span>
                       </div>
                     </label>
                   </div>
                 ))}
                 {filteredStudents.length === 0 && (
-                  <div className="text-sm text-slate-500 text-center py-4">
+                  <div className="text-xs md:text-sm text-slate-500 text-center py-4">
                     {studentSearch ? 'No students found matching your search' : 'All students are already assigned to this coach'}
                   </div>
                 )}
@@ -352,29 +360,30 @@ export function AssignmentModal({ onAssignmentCreated }: AssignmentModalProps) {
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Label htmlFor="notes" className="text-sm">Notes (Optional)</Label>
             <Textarea
               id="notes"
               placeholder="Add any notes about this assignment..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
+              className="text-sm"
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 md:gap-3 pt-2 md:pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsOpen(false)}
-              className="flex-1"
+              className="flex-1 text-sm"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={!selectedCoach || selectedStudents.length === 0 || loading}
-              className="flex-1"
+              className="flex-1 text-sm"
             >
               {loading ? "Creating..." : `Create ${selectedStudents.length} Assignment${selectedStudents.length !== 1 ? 's' : ''}`}
             </Button>
