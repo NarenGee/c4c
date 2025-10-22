@@ -2254,7 +2254,7 @@ export function ProfileClient({ user }: ProfileClientProps) {
   return (
     <TooltipProvider>
       <div className="space-y-6 sm:space-y-8">
-        <div className="max-w-none mx-auto space-y-6 sm:space-y-8">
+        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Header removed per design request */}
 
           {/* Guidance banner removed per design request */}
