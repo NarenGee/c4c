@@ -4,14 +4,6 @@ import { createClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const MODEL_NAME = "gemini-2.5-flash"
-const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-
-if (!API_KEY) {
-  throw new Error("Missing Gemini API key")
-}
-
-const genAI = new GoogleGenerativeAI(API_KEY)
-const model = genAI.getGenerativeModel({ model: MODEL_NAME })
 
 interface Message {
   role: string
@@ -46,6 +38,16 @@ export async function POST(request: NextRequest) {
     if (!messages || !collegeMatches || !studentProfile) {
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
     }
+
+    // Initialize Gemini at runtime (not at build time)
+    const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    if (!API_KEY) {
+      console.error("Missing Gemini API key")
+      return NextResponse.json({ error: "API configuration error" }, { status: 500 })
+    }
+
+    const genAI = new GoogleGenerativeAI(API_KEY)
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME })
 
     // Create a comprehensive prompt for Gemini
     const prompt = createGuidancePrompt(messages, collegeMatches, studentProfile)
