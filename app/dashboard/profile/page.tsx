@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
+
+export const dynamic = "force-dynamic"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { ProfileClient } from "./profile-client"
 import { CoachProfile } from "@/components/profile/coach-profile"

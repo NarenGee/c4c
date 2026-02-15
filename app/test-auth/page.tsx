@@ -3,6 +3,8 @@ import { AuthDebug } from "@/components/debug/auth-debug"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SupabaseEmailTest } from "@/components/debug/supabase-email-test"
 
+export const dynamic = "force-dynamic"
+
 export default async function TestAuthPage() {
   const user = await getCurrentUser()
 
