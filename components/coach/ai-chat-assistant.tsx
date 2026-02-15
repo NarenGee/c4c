@@ -58,10 +58,15 @@ interface ChatSession {
   updated_at: Date
 }
 
+const SIDEBAR_WIDTH_MIN = 320
+const SIDEBAR_WIDTH_MAX = 900
+
 interface AIChatAssistantProps {
   students: CoachStudent[]
   isOpen: boolean
   onToggle: () => void
+  sidebarWidth?: number
+  onSidebarWidthChange?: (width: number) => void
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -80,6 +85,16 @@ const SUGGESTED_QUESTIONS = [
   "Show me all notes I've written about student progress"
 ]
 
+// Format a single line (bold, em, emoji) - no newlines
+function formatInline(line: string) {
+  return line
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/🔴/g, '<span style="color: #ef4444;">🔴</span>')
+    .replace(/🟡/g, '<span style="color: #f59e0b;">🟡</span>')
+    .replace(/🟢/g, '<span style="color: #10b981;">🟢</span>')
+}
+
 // Component to render assistant messages with clickable follow-up questions
 function AssistantMessage({ content, onQuestionClick }: { content: string, onQuestionClick: (question: string) => void }) {
   // Split content by "What's next?" section
@@ -87,15 +102,42 @@ function AssistantMessage({ content, onQuestionClick }: { content: string, onQue
   const mainContent = parts[0]
   const questionsSection = parts[1]
 
-  // Format main content
-  const formattedMainContent = mainContent
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/🔴/g, '<span style="color: #ef4444;">🔴</span>')
-    .replace(/🟡/g, '<span style="color: #f59e0b;">🟡</span>')
-    .replace(/🟢/g, '<span style="color: #10b981;">🟢</span>')
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/\n/g, '<br>')
+  // Split main content into lines and render bullet lines as proper list items
+  const lines = mainContent.split(/\n/)
+  const bulletRegex = /^(\s*)[-•]\s+/
+  const formattedLines: React.ReactNode[] = []
+  let listBuffer: string[] = []
+  const flushList = () => {
+    if (listBuffer.length > 0) {
+      formattedLines.push(
+        <ul key={formattedLines.length} className="list-disc pl-5 my-2 space-y-1">
+          {listBuffer.map((text, i) => (
+            <li key={i} className="pl-1" dangerouslySetInnerHTML={{ __html: formatInline(text) }} />
+          ))}
+        </ul>
+      )
+      listBuffer = []
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const bulletMatch = line.match(bulletRegex)
+    if (bulletMatch) {
+      const bulletText = line.replace(bulletRegex, '').trim()
+      listBuffer.push(bulletText)
+    } else {
+      flushList()
+      if (line.trim() === '') {
+        formattedLines.push(<br key={formattedLines.length} />)
+      } else {
+        formattedLines.push(
+          <span key={formattedLines.length} dangerouslySetInnerHTML={{ __html: formatInline(line) }} />
+        )
+        if (i < lines.length - 1) formattedLines.push(<br key={`br-${formattedLines.length}`} />)
+      }
+    }
+  }
+  flushList()
 
   // Extract questions from the questions section
   const questions = questionsSection
@@ -107,9 +149,9 @@ function AssistantMessage({ content, onQuestionClick }: { content: string, onQue
     : []
 
   return (
-    <div>
-      {/* Main content */}
-      <div dangerouslySetInnerHTML={{ __html: formattedMainContent }} />
+    <div className="min-w-0 max-w-full overflow-hidden">
+      {/* Main content - bullets rendered as list, rest as inline + br */}
+      <div className="text-sm whitespace-pre-wrap break-words min-w-0 max-w-full">{formattedLines}</div>
       
       {/* Follow-up questions */}
       {questions.length > 0 && (
@@ -134,7 +176,7 @@ function AssistantMessage({ content, onQuestionClick }: { content: string, onQue
   )
 }
 
-export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantProps) {
+export function AIChatAssistant({ students, isOpen, onToggle, sidebarWidth = 384, onSidebarWidthChange }: AIChatAssistantProps) {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null)
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
   const [message, setMessage] = useState("")
@@ -143,6 +185,17 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const resizeStartX = useRef(0)
+  const resizeStartWidth = useRef(sidebarWidth)
+  const isResizing = useRef(false)
+
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // Load chat sessions from localStorage on mount
   useEffect(() => {
@@ -185,6 +238,38 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  // Resize handle: global mouse move/up when dragging
+  useEffect(() => {
+    if (!onSidebarWidthChange) return
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return
+      const delta = resizeStartX.current - e.clientX // drag left = positive delta = wider
+      let w = resizeStartWidth.current + delta
+      w = Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, w))
+      onSidebarWidthChange(w)
+    }
+    const onMouseUp = () => {
+      isResizing.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [onSidebarWidthChange])
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    isResizing.current = true
+    resizeStartX.current = e.clientX
+    resizeStartWidth.current = sidebarWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
 
   const createNewSession = () => {
     const newSession: ChatSession = {
@@ -292,16 +377,17 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
         }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to get AI response')
-      }
+      const data = await response.json().catch(() => ({}))
 
-      const data = await response.json()
+      if (!response.ok) {
+        const errorMessage = typeof data?.error === 'string' ? data.error : 'Failed to get AI response'
+        throw new Error(errorMessage)
+      }
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response,
+        content: data?.response ?? 'I didn\'t get a response. Please try again.',
         timestamp: new Date()
       }
 
@@ -324,12 +410,13 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
       })
 
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
       console.error('Error sending message:', error)
       
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I apologize, but I'm having trouble connecting right now. Please try again in a moment.",
+        content: `I couldn't complete your request. ${message} Please try again.`,
         timestamp: new Date()
       }
 
@@ -403,30 +490,51 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
     )
   }
 
+  const isResizable = typeof onSidebarWidthChange === 'function'
+
   return (
     <>
-      {/* Backdrop */}
-      {isOpen && (
+      {/* Backdrop only when not using flex layout (no resize) */}
+      {isOpen && !isResizable && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-20 z-40"
           onClick={onToggle}
         />
       )}
       
-      {/* Sidebar */}
-      <div className={`fixed right-0 top-0 h-screen w-96 bg-white border-l border-slate-200 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}>
-      {/* Header */}
-      <div className="bg-slate-800 text-white p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Bot className="h-6 w-6" />
-          <div>
-            <h3 className="font-semibold">AI Coach Assistant</h3>
-            <p className="text-sm text-slate-300">{students.length} students • Access to all student data</p>
+      {/* Sidebar: full width on mobile, fixed width on desktop; always fixed to viewport right */}
+      <div
+        className={`flex flex-col h-screen bg-white border-l border-slate-200 shadow-2xl overflow-hidden fixed right-0 top-0 z-50 ${
+          !isResizable ? `transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}` : ''
+        }`}
+        style={
+          isMobile
+            ? { width: '100%', maxWidth: '100vw', transition: 'width 0.2s ease' }
+            : isResizable
+              ? { width: sidebarWidth, minWidth: sidebarWidth, transition: 'width 0.2s ease' }
+              : { width: '24rem' }
+        }
+      >
+      {/* Resize handle (left edge) - only when resizable, open, and not mobile */}
+      {isResizable && isOpen && !isMobile && (
+        <div
+          className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-400/20 active:bg-blue-400/30 z-20 flex items-center justify-center group"
+          onMouseDown={handleResizeStart}
+          aria-label="Resize sidebar"
+        >
+          <span className="w-0.5 h-16 bg-slate-300 group-hover:bg-blue-500 rounded-full opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        </div>
+      )}
+      {/* Header - safe area on mobile, compact layout */}
+      <div className="bg-slate-800 text-white p-3 sm:p-4 flex items-center justify-between min-w-0 gap-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <Bot className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-sm sm:text-base truncate">AI Coach Assistant</h3>
+            <p className="text-xs sm:text-sm text-slate-300 truncate">{students.length} students</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
@@ -448,9 +556,9 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
 
       {/* Session History */}
       {chatSessions.length > 1 && (
-        <div className="bg-slate-50 border-b p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-slate-700">Recent Conversations</span>
+        <div className="bg-slate-50 border-b p-2 sm:p-3 min-w-0">
+          <div className="flex items-center justify-between mb-2 min-w-0">
+            <span className="text-sm font-medium text-slate-700 truncate">Recent Conversations</span>
             <Button
               variant="ghost"
               size="sm"
@@ -483,34 +591,34 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
         </div>
       )}
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+      {/* Messages - full width on mobile, no inner scroll */}
+      <ScrollArea className="flex-1 min-w-0 p-3 sm:p-4 overflow-x-hidden">
+        <div className="space-y-4 min-w-0 max-w-full">
           {currentSession?.messages.length === 0 || !currentSession ? (
-            <div className="text-center text-slate-500 py-8">
-              <Bot className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-              <h4 className="font-medium mb-2">Hi! I'm your AI coaching assistant.</h4>
-              <p className="text-sm mb-4">I can help you analyze your students' progress, identify who needs attention, and suggest next steps.</p>
+            <div className="text-center text-slate-500 py-6 sm:py-8 px-2">
+              <Bot className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 text-slate-400" />
+              <h4 className="font-medium mb-2 text-sm sm:text-base">Hi! I'm your AI coaching assistant.</h4>
+              <p className="text-xs sm:text-sm mb-4">I can help you analyze your students' progress and suggest next steps.</p>
             </div>
           ) : (
             currentSession.messages.map((msg) => (
-              <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+              <div key={msg.id} className={`flex gap-2 sm:gap-3 min-w-0 max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex gap-2 sm:gap-3 max-w-[95%] sm:max-w-[85%] min-w-0 flex-1 ${msg.role === 'user' ? 'flex-row-reverse justify-end' : 'flex-row'}`}>
+                  <div className={`flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
                     msg.role === 'user' ? 'bg-blue-500' : 'bg-slate-600'
                   }`}>
                     {msg.role === 'user' ? (
-                      <User className="h-4 w-4 text-white" />
+                      <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                     ) : (
-                      <Bot className="h-4 w-4 text-white" />
+                      <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                     )}
                   </div>
-                  <div className={`p-3 rounded-lg ${
+                  <div className={`p-2.5 sm:p-3 rounded-lg min-w-0 overflow-hidden max-w-full ${
                     msg.role === 'user' 
                       ? 'bg-blue-500 text-white' 
                       : 'bg-slate-100 text-slate-800'
                   }`}>
-                    <div className="text-sm whitespace-pre-wrap">
+                    <div className="text-xs sm:text-sm whitespace-pre-wrap break-words">
                       {msg.role === 'assistant' ? (
                         <AssistantMessage content={msg.content} onQuestionClick={selectSuggestedQuestion} />
                       ) : (
@@ -539,8 +647,8 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
           
           {/* Loading indicator */}
           {isLoading && (
-            <div className="flex gap-3 justify-start">
-              <div className="flex gap-3 max-w-[85%]">
+            <div className="flex gap-3 justify-start min-w-0">
+              <div className="flex gap-3 max-w-[85%] min-w-0">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-slate-600">
                   <Bot className="h-4 w-4 text-white" />
                 </div>
@@ -560,17 +668,17 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
 
       {/* Suggestions */}
       {showSuggestions && (
-        <div className="p-4 border-t bg-slate-50">
-          <div className="flex items-center gap-2 mb-3">
-            <Lightbulb className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-medium text-slate-700">Suggested Questions</span>
+        <div className="p-3 sm:p-4 border-t bg-slate-50 min-w-0">
+          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+            <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-medium text-slate-700">Suggested Questions</span>
           </div>
-          <div className="mb-3 p-2 bg-blue-50 rounded-lg">
+          <div className="mb-2 sm:mb-3 p-2 bg-blue-50 rounded-lg min-w-0">
             <p className="text-xs text-blue-700">
-              💡 I can access all student data: Overview, Profile, Preferences, Recommendations, Applications, and Notes
+              {isMobile ? "💡 Ask about students, profiles, notes, applications." : "💡 I can access all student data: Overview, Profile, Preferences, Recommendations, Applications, and Notes"}
             </p>
           </div>
-          <div className="space-y-2 max-h-32 overflow-y-auto">
+          <div className="space-y-2 max-h-28 sm:max-h-32 overflow-y-auto">
             {SUGGESTED_QUESTIONS.slice(0, 4).map((question, index) => (
               <Button
                 key={index}
@@ -586,23 +694,23 @@ export function AIChatAssistant({ students, isOpen, onToggle }: AIChatAssistantP
         </div>
       )}
 
-      {/* Input */}
-      <div className="p-4 border-t bg-white">
-        <div className="flex gap-2">
+      {/* Input - safe area bottom on mobile, compact */}
+      <div className="p-3 sm:p-4 border-t bg-white min-w-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex gap-2 min-w-0">
           <Input
             ref={inputRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask about profiles, preferences, applications, notes..."
+            placeholder={isMobile ? "Ask about students, notes..." : "Ask about profiles, preferences, applications, notes..."}
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 min-w-0 text-sm sm:text-base"
           />
           <Button 
             onClick={sendMessage} 
             disabled={!message.trim() || isLoading}
             size="sm"
-            className="bg-slate-800 hover:bg-slate-700"
+            className="bg-slate-800 hover:bg-slate-700 flex-shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>

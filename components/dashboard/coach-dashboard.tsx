@@ -19,6 +19,7 @@ import { StudentNotesModal } from "@/components/coach/student-notes-modal"
 import { ExportStudentsButton } from "@/components/coach/export-students-button"
 import { StudentDetailModal } from "@/components/coach/student-detail-modal"
 import { AIChatAssistant } from "@/components/coach/ai-chat-assistant"
+import { useCoachSidebar } from "@/components/dashboard/dashboard-shell"
 
 interface CoachStudent {
   id: string
@@ -52,14 +53,42 @@ export function CoachDashboard({ user }: CoachDashboardProps) {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
-  // Close AI assistant by default on small screens
-  const [isAIChatOpen, setIsAIChatOpen] = useState(
+  const coachSidebar = useCoachSidebar()
+  // Local state when not inside DashboardShell (e.g. standalone)
+  const [localOpen, setLocalOpen] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   )
+  const [localWidth, setLocalWidth] = useState(() => {
+    if (typeof window === 'undefined') return 384
+    const stored = localStorage.getItem('coach-ai-sidebar-width')
+    if (stored) {
+      const n = parseInt(stored, 10)
+      if (!isNaN(n) && n >= 320 && n <= 900) return n
+    }
+    return 384
+  })
+  // Use context when on dashboard page so header + content shift together; else local
+  const isAIChatOpen = coachSidebar ? coachSidebar.isOpen : localOpen
+  const setAIChatOpen = coachSidebar ? coachSidebar.setIsOpen : setLocalOpen
+  const sidebarWidth = coachSidebar ? coachSidebar.width : localWidth
+  const handleSidebarWidthChange = coachSidebar
+    ? coachSidebar.setWidth
+    : (w: number) => {
+        setLocalWidth(w)
+        if (typeof window !== 'undefined') localStorage.setItem('coach-ai-sidebar-width', String(w))
+      }
 
   useEffect(() => {
     loadStudents()
   }, [])
+
+  // When using context (dashboard page), set initial open state on large screens
+  useEffect(() => {
+    if (coachSidebar && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      coachSidebar.setIsOpen(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!coachSidebar])
 
   const loadStudents = async () => {
     try {
@@ -122,7 +151,8 @@ export function CoachDashboard({ user }: CoachDashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50">
+      <div className="min-w-0 overflow-auto p-6">
       <div className="space-y-8">
         {/* Header Section */}
         <div className="text-center pb-6">
@@ -366,12 +396,15 @@ export function CoachDashboard({ user }: CoachDashboardProps) {
         </Card>
       </div>
 
-      {/* AI Chat Assistant Sidebar */}
+      {/* AI Chat Assistant Sidebar - resizable when open */}
       <AIChatAssistant
         students={students}
         isOpen={isAIChatOpen}
-        onToggle={() => setIsAIChatOpen(!isAIChatOpen)}
+        onToggle={() => setAIChatOpen(!isAIChatOpen)}
+        sidebarWidth={sidebarWidth}
+        onSidebarWidthChange={handleSidebarWidthChange}
       />
+      </div>
     </div>
   )
 }
