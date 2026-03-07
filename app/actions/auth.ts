@@ -359,6 +359,50 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
   }
 }
 
+export async function requestPasswordReset(email: string): Promise<AuthResult> {
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const adminClient = createAdminClient()
+
+    const { data, error } = await adminClient.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo: `${appUrl}/reset-password` },
+    })
+
+    if (error) {
+      console.error("Reset request error:", error)
+      return { success: false, error: error.message }
+    }
+
+    const actionLink =
+      (data as { properties?: { action_link?: string }; action_link?: string })?.properties?.action_link ??
+      (data as { action_link?: string })?.action_link
+
+    if (!actionLink) {
+      console.error("No action link in generateLink response")
+      return { success: false, error: "Failed to generate reset link" }
+    }
+
+    const { generatePasswordResetEmail } = await import("@/lib/email-templates")
+    const { sendEmail } = await import("@/lib/email")
+    const userName = email.split("@")[0] || "there"
+    const emailContent = generatePasswordResetEmail({ userName, resetUrl: actionLink })
+
+    await sendEmail({
+      to: email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Password reset request error:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
 export async function signOut() {
   try {
     const supabase = await createClient()

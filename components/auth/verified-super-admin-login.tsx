@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -155,7 +156,12 @@ export function VerifiedSuperAdminLogin() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="verified-password" className="text-sm text-slate-200">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="verified-password" className="text-sm text-slate-200">Password</Label>
+            <Link href="/forgot-password" className="text-xs text-blue-400 hover:text-blue-300 font-medium">
+              Forgot password?
+            </Link>
+          </div>
           <div className="relative">
             <Input
               id="verified-password"

@@ -292,6 +292,166 @@ We're excited to help you on this journey. If you have any questions, don't hesi
   return { subject, html, text }
 }
 
+export interface PasswordResetEmailData {
+  userName: string
+  resetUrl: string
+}
+
+export function generatePasswordResetEmail(data: PasswordResetEmailData) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const signInUrl = `${baseUrl}/login`
+
+  const subject = `Reset your password - Coaching for College`
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Reset Your Password - Coaching for College</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #f8f9fa;
+        }
+        .container {
+          background: #ffffff;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+          background: linear-gradient(135deg, #364C56 0%, #4A5568 100%);
+          color: white;
+          padding: 40px 30px;
+          text-align: center;
+        }
+        .content {
+          padding: 40px 30px;
+          text-align: center;
+        }
+        .welcome-text {
+          font-size: 24px;
+          font-weight: 600;
+          color: #364C56;
+          margin-bottom: 20px;
+        }
+        .message {
+          font-size: 16px;
+          color: #4A5568;
+          margin-bottom: 30px;
+          line-height: 1.6;
+        }
+        .button {
+          display: inline-block;
+          background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+          color: #FFFFFF !important;
+          padding: 16px 32px;
+          text-decoration: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+          margin: 20px 0;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+          text-align: center;
+        }
+        .footer {
+          background: #f8f9fa;
+          padding: 30px;
+          text-align: center;
+          border-top: 1px solid #e2e8f0;
+        }
+        .footer-text {
+          font-size: 14px;
+          color: #6c757d;
+          margin-bottom: 10px;
+        }
+        .signin-link {
+          color: #364C56;
+          text-decoration: none;
+          font-weight: 500;
+        }
+        .divider {
+          height: 1px;
+          background: #e2e8f0;
+          margin: 30px 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div style="margin-bottom: 20px;">
+            <img src="data:image/png;base64,${getBase64Logo()}" alt="Coaching for College" style="width: 120px; height: auto; display: block; margin: 0 auto;">
+            <div style="color: white; font-size: 18px; font-weight: 600; margin-top: 10px; text-align: center;">Coaching for College</div>
+          </div>
+          <h1 style="margin: 0; font-size: 28px; font-weight: 700;">Reset your password</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">We'll help you get back into your account</p>
+        </div>
+        
+        <div class="content">
+          <div class="welcome-text">Hello ${data.userName}!</div>
+          
+          <div class="message">
+            You requested a password reset for your Coaching for College account.
+            <br><br>
+            Click the button below to set a new password. This link will expire in 1 hour.
+          </div>
+          
+          <a href="${data.resetUrl}" class="button" style="color: #FFFFFF !important; text-decoration: none;">Reset password</a>
+          
+          <div class="divider"></div>
+          
+          <div class="message" style="font-size: 14px; color: #6c757d;">
+            If the button doesn't work, copy and paste this link into your browser:
+            <br>
+            <a href="${data.resetUrl}" style="color: #364C56; word-break: break-all;">${data.resetUrl}</a>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <div class="footer-text">
+            If you didn't request this reset, you can safely ignore this email.
+          </div>
+          <a href="${signInUrl}" class="signin-link">Sign in to your account</a>
+          <div class="footer-text" style="margin-top: 20px;">
+            &copy; 2025 Coaching for College. All rights reserved.
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+
+  const text = `
+Reset your password - Coaching for College
+
+Hello ${data.userName}!
+
+You requested a password reset for your Coaching for College account.
+
+Set a new password by visiting this link (expires in 1 hour):
+
+${data.resetUrl}
+
+If you didn't request this reset, you can safely ignore this email.
+
+Sign in: ${signInUrl}
+
+---
+© 2025 Coaching for College. All rights reserved.
+  `
+
+  return { subject, html, text }
+}
+
 export interface EmailConfirmationData {
   userName: string
   confirmationUrl: string

@@ -50,3 +50,33 @@ export function createClient() {
     throw error
   }
 }
+
+/**
+ * Client that detects session from URL (hash). Use only on pages that handle
+ * auth redirects (e.g. /reset-password after clicking email link).
+ *
+ * Must use flowType "implicit" because admin.generateLink() produces a link
+ * that Supabase's verify endpoint resolves back to the page with tokens in
+ * the URL hash (#access_token=...) — implicit flow. A PKCE client ignores
+ * those hash tokens and will never establish the session.
+ */
+export function createClientForAuthUrl() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return createClient()
+  }
+
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      flowType: "implicit",
+    },
+    global: {
+      headers: { "X-Client-Info": "supabase-js-web" },
+    },
+  })
+}

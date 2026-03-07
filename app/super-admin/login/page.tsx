@@ -47,7 +47,7 @@ export default function SuperAdminLoginPage() {
               </p>
               <p className="text-xs md:text-sm text-slate-400">
                 Regular user?{" "}
-                <a href="/signin" className="text-blue-400 hover:text-blue-300 font-medium">
+                <a href="/login" className="text-blue-400 hover:text-blue-300 font-medium">
                   Sign in here
                 </a>
               </p>
