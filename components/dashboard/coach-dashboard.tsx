@@ -91,34 +91,20 @@ export function CoachDashboard({ user }: CoachDashboardProps) {
   }, [!!coachSidebar])
 
   const loadStudents = async () => {
+    const startedAt = performance.now()
     try {
-      console.log("Loading students for coach...")
       const response = await fetch('/api/coach/students')
       const data = await response.json()
-      console.log("API response:", data)
       
       if (data.success) {
         setStudents(data.students || [])
-        console.log("Loaded students:", data.students?.length || 0)
-        
-        // Debug: Log student details for Ethan
-        const ethan = data.students?.find(s => s.email?.includes('coachingforcollegead'))
-        if (ethan) {
-          console.log("🧑‍🎓 Ethan's data:", {
-            email: ethan.email,
-            profile_completion: ethan.profile_completion,
-            college_matches_count: ethan.college_matches_count,
-            college_list_count: ethan.college_list_count,
-            grade_level: ethan.grade_level,
-            gpa: ethan.gpa
-          })
-        }
       } else {
         console.error("API error:", data.error)
       }
     } catch (error) {
       console.error("Failed to load students:", error)
     } finally {
+      console.info(`[perf] coach students loaded in ${Math.round(performance.now() - startedAt)}ms`)
       setLoading(false)
     }
   }

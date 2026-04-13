@@ -3,9 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(request: NextRequest) {
+  const requestStart = Date.now()
+  const isDev = process.env.NODE_ENV !== "production"
   try {
-    console.log("🔍 [DEBUG-v2] Coach students API called at", new Date().toISOString())
-    // Simple auth check using admin client
     const supabase = await createClient()
     const adminClient = createAdminClient()
     
@@ -34,24 +34,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is a coach (either current_role or original role)
-    if (user.current_role !== 'coach' && user.role !== 'coach') {
-      console.log("Access denied - not a coach. User role:", user.role, "Current role:", user.current_role)
+    if (user.current_role !== "coach" && user.role !== "coach") {
       return NextResponse.json(
         { success: false, error: "Unauthorized - Coach access required" },
         { status: 401 }
       )
     }
 
-    console.log("Fetching assignments for coach:", user.id, user.email)
-
-    // First, get basic assignments
     const { data: assignments, error: assignmentsError } = await adminClient
       .from("coach_student_assignments")
       .select("student_id, assigned_at")
       .eq("coach_id", user.id)
       .eq("is_active", true)
-
-    console.log("Assignments query result:", { assignments, assignmentsError })
 
     if (assignmentsError) {
       console.error("Assignment error:", assignmentsError)
@@ -62,164 +56,220 @@ export async function GET(request: NextRequest) {
     }
 
     if (!assignments || assignments.length === 0) {
-      console.log("No assignments found for coach")
       return NextResponse.json({
         success: true,
         students: [],
       })
     }
 
-    const students = []
+    const studentIds = assignments.map((assignment) => assignment.student_id)
+    const studentIdSet = new Set(studentIds)
+    const assignmentByStudentId = new Map(
+      assignments.map((assignment) => [assignment.student_id, assignment])
+    )
 
-    for (const assignment of assignments) {
-      const studentId = assignment.student_id
-      console.log("📝 Processing student:", studentId)
-      
-      // Get student basic info
-      const { data: student, error: studentError } = await adminClient
+    const queryStart = Date.now()
+    const [
+      studentsResult,
+      profilesResult,
+      matchesByUserIdResult,
+      matchesByStudentIdResult,
+      collegeByStudentIdResult,
+      collegeByUserIdResult,
+      authUsersResult,
+    ] = await Promise.all([
+      adminClient
         .from("users")
         .select("id, full_name, email")
-        .eq("id", studentId)
-        .single()
-
-      if (studentError || !student) {
-        console.error("❌ Failed to fetch student:", studentId, studentError)
-        continue
-      }
-
-      console.log("✅ Student found:", student.email)
-
-      // Get last login info from auth.users
-      let lastSignInAt = null
-      try {
-        const { data: authUser } = await adminClient.auth.admin.getUserById(studentId)
-        lastSignInAt = authUser?.user?.last_sign_in_at
-      } catch (error) {
-        console.log("Could not fetch auth user data:", error)
-      }
-
-      // Get student profile (handle multiple records)
-      const { data: profiles, error: profileError } = await adminClient
+        .in("id", studentIds),
+      adminClient
         .from("student_profiles")
-        .select("grade_level, gpa, country_of_residence")
-        .eq("user_id", studentId)
-        .order("updated_at", { ascending: false })
-        
-      // Find the most complete profile (not just the newest)
-      let profile = null
-      if (profiles && profiles.length > 0) {
-        // Try to find a profile with data
-        profile = profiles.find(p => p.grade_level || p.gpa || p.country_of_residence) || profiles[0]
-      }
-        
-      console.log(`📋 [DEBUG-v2] Profile query for ${student.email}:`, {
-        profileCount: profiles?.length || 0,
-        error: profileError,
-        selectedProfile: profile,
-        allProfiles: profiles?.map(p => ({ grade_level: p.grade_level, gpa: p.gpa, country_of_residence: p.country_of_residence })) || [],
-        lastSignInAt,
-        studentId,
-        coachId: user.id
-      })
-      
-      // Get profile completion
-      console.log("🧮 Calculating profile completion for:", student.email)
-      const profileCompletion = await calculateProfileCompletion(adminClient, studentId)
-      console.log(`✅ Profile completion for ${student.email}:`, profileCompletion)
-      
-      // Get college matches count (try user_id first, fallback to student_id)
-      let matchesCount = 0
-      const { count: matchesWithUserId } = await adminClient
+        .select("user_id, grade_level, gpa, country_of_residence, interests, preferred_majors, budget_range, location_preferences, sat_score, act_score, updated_at")
+        .in("user_id", studentIds)
+        .order("updated_at", { ascending: false }),
+      adminClient
         .from("college_matches")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", studentId)
-      
-      if (matchesWithUserId !== null) {
-        matchesCount = matchesWithUserId
-      } else {
-        const { count: matchesWithStudentId } = await adminClient
-          .from("college_matches")
-          .select("*", { count: "exact", head: true })
-          .eq("student_id", studentId)
-        matchesCount = matchesWithStudentId || 0
-      }
-
-      // Get college list with application stages (try different column names)
-      let collegeList = null
-      let collegeError = null
-      
-      // First try with student_id
-      const { data: collegeListWithStudentId, error: collegeError1 } = await adminClient
+        .select("id, user_id, student_id")
+        .in("user_id", studentIds),
+      adminClient
+        .from("college_matches")
+        .select("id, user_id, student_id")
+        .in("student_id", studentIds),
+      adminClient
         .from("my_college_list")
-        .select("application_stage")
-        .eq("student_id", studentId)
-        
-      if (collegeListWithStudentId && collegeListWithStudentId.length > 0) {
-        collegeList = collegeListWithStudentId
-        collegeError = collegeError1
-      } else {
-        // Fallback to user_id if needed
-        const { data: collegeListWithUserId, error: collegeError2 } = await adminClient
-          .from("my_college_list")
-          .select("application_stage")
-          .eq("user_id", studentId)
-        collegeList = collegeListWithUserId
-        collegeError = collegeError2
-      }
-      
-      console.log(`🎓 [DEBUG-v2] College list for ${student.email}:`, {
-        listCount: collegeList?.length || 0,
-        error: collegeError,
-        sampleStages: collegeList?.slice(0, 3).map(c => c.application_stage) || [],
-        allStages: collegeList?.map(c => c.application_stage) || []
-      })
+        .select("id, student_id, user_id, application_stage")
+        .in("student_id", studentIds),
+      adminClient
+        .from("my_college_list")
+        .select("id, student_id, user_id, application_stage")
+        .in("user_id", studentIds),
+      Promise.all(
+        studentIds.map(async (studentId) => {
+          try {
+            const { data: authUser } = await adminClient.auth.admin.getUserById(studentId)
+            return [studentId, authUser?.user?.last_sign_in_at ?? null] as const
+          } catch {
+            return [studentId, null] as const
+          }
+        })
+      ),
+    ])
+    const queryMs = Date.now() - queryStart
 
-      // Calculate application progress
-      const applicationProgress = {
-        considering: 0,
-        planning_to_apply: 0,
-        applied: 0,
-        interviewing: 0,
-        accepted: 0,
-        rejected: 0,
-        enrolled: 0,
-      }
-
-      collegeList?.forEach(college => {
-        const stage = college.application_stage || 'considering'
-        if (stage in applicationProgress) {
-          applicationProgress[stage as keyof typeof applicationProgress]++
-        }
-      })
-      
-      console.log(`📊 [DEBUG-v2] Application progress for ${student.email}:`, {
-        rawStages: collegeList?.map(c => c.application_stage) || [],
-        calculatedProgress: applicationProgress,
-        totalColleges: collegeList?.length || 0
-      })
-
-      students.push({
-        id: student.id,
-        full_name: student.full_name,
-        email: student.email,
-        grade_level: profile?.grade_level,
-        gpa: profile?.gpa,
-        country_of_residence: profile?.country_of_residence,
-        profile_completion: profileCompletion,
-        college_matches_count: matchesCount || 0,
-        college_list_count: collegeList?.length || 0,
-        application_progress: applicationProgress,
-        assigned_at: assignment.assigned_at,
-        last_sign_in_at: lastSignInAt,
-      })
+    if (studentsResult.error) {
+      console.error("Failed to fetch student users:", studentsResult.error)
+      return NextResponse.json(
+        { success: false, error: "Failed to fetch students" },
+        { status: 500 }
+      )
+    }
+    if (profilesResult.error) {
+      console.error("Failed to fetch profiles:", profilesResult.error)
+    }
+    if (matchesByUserIdResult.error || matchesByStudentIdResult.error) {
+      console.error("Failed to fetch matches:", matchesByUserIdResult.error || matchesByStudentIdResult.error)
+    }
+    if (collegeByStudentIdResult.error || collegeByUserIdResult.error) {
+      console.error("Failed to fetch college list:", collegeByStudentIdResult.error || collegeByUserIdResult.error)
     }
 
-    console.log("Final students result:", students.length, "students")
+    const studentsById = new Map(
+      (studentsResult.data ?? []).map((student) => [student.id, student])
+    )
 
-    return NextResponse.json({
+    const profilesByStudentId = new Map<string, any[]>()
+    for (const profile of profilesResult.data ?? []) {
+      const profileList = profilesByStudentId.get(profile.user_id) ?? []
+      profileList.push(profile)
+      profilesByStudentId.set(profile.user_id, profileList)
+    }
+
+    const matchesByStudentId = new Map<string, Set<string>>()
+    const allMatches = [
+      ...(matchesByUserIdResult.data ?? []),
+      ...(matchesByStudentIdResult.data ?? []),
+    ]
+    for (const match of allMatches) {
+      const possibleIds = [match.user_id, match.student_id].filter((value): value is string => !!value)
+      for (const possibleId of possibleIds) {
+        if (!studentIdSet.has(possibleId)) continue
+        const set = matchesByStudentId.get(possibleId) ?? new Set<string>()
+        set.add(match.id)
+        matchesByStudentId.set(possibleId, set)
+      }
+    }
+
+    const applicationProgressByStudentId = new Map<
+      string,
+      {
+        considering: number
+        planning_to_apply: number
+        applied: number
+        interviewing: number
+        accepted: number
+        rejected: number
+        enrolled: number
+        total: number
+      }
+    >()
+    const seenCollegeRowsByStudentId = new Map<string, Set<string>>()
+    const allCollegeRows = [
+      ...(collegeByStudentIdResult.data ?? []),
+      ...(collegeByUserIdResult.data ?? []),
+    ]
+    for (const row of allCollegeRows) {
+      const possibleIds = [row.student_id, row.user_id].filter((value): value is string => !!value)
+      for (const possibleId of possibleIds) {
+        if (!studentIdSet.has(possibleId)) continue
+        const seen = seenCollegeRowsByStudentId.get(possibleId) ?? new Set<string>()
+        if (seen.has(row.id)) {
+          continue
+        }
+        seen.add(row.id)
+        seenCollegeRowsByStudentId.set(possibleId, seen)
+
+        const progress = applicationProgressByStudentId.get(possibleId) ?? {
+          considering: 0,
+          planning_to_apply: 0,
+          applied: 0,
+          interviewing: 0,
+          accepted: 0,
+          rejected: 0,
+          enrolled: 0,
+          total: 0,
+        }
+        const stage = row.application_stage || "considering"
+        if (stage in progress) {
+          progress[stage as keyof Omit<typeof progress, "total">] += 1
+        } else {
+          progress.considering += 1
+        }
+        progress.total += 1
+        applicationProgressByStudentId.set(possibleId, progress)
+      }
+    }
+
+    const authByStudentId = new Map(authUsersResult)
+    const responseBuildStart = Date.now()
+    const students = studentIds
+      .map((studentId) => {
+        const student = studentsById.get(studentId)
+        if (!student) return null
+
+        const profiles = profilesByStudentId.get(studentId) ?? []
+        const bestProfile = pickBestProfile(profiles)
+        const matchesCount = matchesByStudentId.get(studentId)?.size ?? 0
+        const progress = applicationProgressByStudentId.get(studentId) ?? {
+          considering: 0,
+          planning_to_apply: 0,
+          applied: 0,
+          interviewing: 0,
+          accepted: 0,
+          rejected: 0,
+          enrolled: 0,
+          total: 0,
+        }
+        const profileCompletion = calculateProfileCompletion(bestProfile, matchesCount > 0, progress.total > 0)
+
+        return {
+          id: student.id,
+          full_name: student.full_name,
+          email: student.email,
+          grade_level: bestProfile?.grade_level,
+          gpa: bestProfile?.gpa,
+          country_of_residence: bestProfile?.country_of_residence,
+          profile_completion: profileCompletion,
+          college_matches_count: matchesCount,
+          college_list_count: progress.total,
+          application_progress: {
+            considering: progress.considering,
+            planning_to_apply: progress.planning_to_apply,
+            applied: progress.applied,
+            interviewing: progress.interviewing,
+            accepted: progress.accepted,
+            rejected: progress.rejected,
+            enrolled: progress.enrolled,
+          },
+          assigned_at: assignmentByStudentId.get(studentId)?.assigned_at,
+          last_sign_in_at: authByStudentId.get(studentId) ?? null,
+        }
+      })
+      .filter(Boolean)
+
+    const responseBuildMs = Date.now() - responseBuildStart
+    const totalMs = Date.now() - requestStart
+    const response: Record<string, unknown> = {
       success: true,
       students,
-    })
+    }
+    if (isDev) {
+      response.timings = {
+        query_ms: queryMs,
+        response_build_ms: responseBuildMs,
+        total_ms: totalMs,
+      }
+    }
+    return NextResponse.json(response)
 
   } catch (error: any) {
     console.error("Error fetching coach students:", error)
@@ -230,97 +280,36 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function calculateProfileCompletion(supabase: any, studentId: string): Promise<number> {
-  const { data: profiles, error: profileError } = await supabase
-    .from("student_profiles")
-    .select("*")
-    .eq("user_id", studentId)
-    .order("updated_at", { ascending: false })
+function pickBestProfile(profiles: any[]): any | null {
+  if (!profiles || profiles.length === 0) return null
+  return profiles.reduce((best, current) => {
+    const currentScore = (current.grade_level ? 1 : 0) +
+      (current.gpa ? 1 : 0) +
+      (current.interests?.length || 0) +
+      (current.preferred_majors?.length || 0) +
+      (current.budget_range ? 1 : 0) +
+      (current.location_preferences?.length || 0) +
+      (current.sat_score ? 1 : 0) +
+      (current.act_score ? 1 : 0)
+    const bestScore = (best.grade_level ? 1 : 0) +
+      (best.gpa ? 1 : 0) +
+      (best.interests?.length || 0) +
+      (best.preferred_majors?.length || 0) +
+      (best.budget_range ? 1 : 0) +
+      (best.location_preferences?.length || 0) +
+      (best.sat_score ? 1 : 0) +
+      (best.act_score ? 1 : 0)
+    return currentScore > bestScore ? current : best
+  }, profiles[0])
+}
 
-  // Find the most complete profile for calculation
-  let profile = null
-  if (profiles && profiles.length > 0) {
-    // Try to find a profile with the most data
-    profile = profiles.reduce((best, current) => {
-      const currentScore = (current.grade_level ? 1 : 0) + 
-                          (current.gpa ? 1 : 0) + 
-                          (current.interests?.length || 0) + 
-                          (current.preferred_majors?.length || 0) +
-                          (current.budget_range ? 1 : 0) +
-                          (current.location_preferences?.length || 0) +
-                          (current.sat_score ? 1 : 0) +
-                          (current.act_score ? 1 : 0)
-      
-      const bestScore = (best.grade_level ? 1 : 0) + 
-                       (best.gpa ? 1 : 0) + 
-                       (best.interests?.length || 0) + 
-                       (best.preferred_majors?.length || 0) +
-                       (best.budget_range ? 1 : 0) +
-                       (best.location_preferences?.length || 0) +
-                       (best.sat_score ? 1 : 0) +
-                       (best.act_score ? 1 : 0)
-      
-      return currentScore > bestScore ? current : best
-    }, profiles[0])
-  }
-
-  // Get college matches count (indicates they've generated recommendations)
-  let hasCollegeMatches = false
-  const { count: matchesCount } = await supabase
-    .from("college_matches")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", studentId)
-  
-  if (matchesCount === null) {
-    // Fallback to student_id if user_id doesn't work
-    const { count: altMatchesCount } = await supabase
-      .from("college_matches")
-      .select("*", { count: "exact", head: true })
-      .eq("student_id", studentId)
-    hasCollegeMatches = altMatchesCount && altMatchesCount > 0
-  } else {
-    hasCollegeMatches = matchesCount > 0
-  }
-
-  // Get college list count (indicates they've added colleges to their list)
-  let hasCollegeList = false
-  const { count: collegeListCount } = await supabase
-    .from("my_college_list")
-    .select("*", { count: "exact", head: true })
-    .eq("student_id", studentId)
-  
-  if (collegeListCount === null) {
-    // Fallback to user_id if student_id doesn't work
-    const { count: altCollegeListCount } = await supabase
-      .from("my_college_list")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", studentId)
-    hasCollegeList = altCollegeListCount && altCollegeListCount > 0
-  } else {
-    hasCollegeList = collegeListCount > 0
-  }
-  
-  console.log(`📊 [DEBUG-v2] Profile completion calculation for student ${studentId}:`, { 
-    profileFound: !!profile, 
-    profileCount: profiles?.length || 0, 
-    hasCollegeMatches,
-    hasCollegeList,
-    matchesCount: matchesCount || 0,
-    collegeListCount: collegeListCount || 0,
-    error: profileError,
-    selectedProfile: profile ? {
-      grade_level: profile.grade_level,
-      gpa: profile.gpa,
-      interests: profile.interests?.length || 0,
-      preferred_majors: profile.preferred_majors?.length || 0,
-      budget_range: !!profile.budget_range,
-      sat_score: !!profile.sat_score,
-      act_score: !!profile.act_score
-    } : null
-  })
-
+function calculateProfileCompletion(
+  profile: any | null,
+  hasCollegeMatches: boolean,
+  hasCollegeList: boolean
+): number {
   // Calculate completion based on three main categories
-  let totalSections = 3
+  const totalSections = 3
   let completedSections = 0
 
   // 1. Basic Profile Details (40% weight)
@@ -373,17 +362,6 @@ async function calculateProfileCompletion(supabase: any, studentId: string): Pro
   }
 
   const finalCompletion = Math.min(100, baseCompletion + bonusPoints)
-
-  console.log(`📊 [DEBUG-v2] Profile completion breakdown for student ${studentId}:`, {
-    profileDetailsScore: Math.round(profileDetailsScore * 100),
-    hasCollegeMatches,
-    hasCollegeList,
-    completedSections,
-    totalSections,
-    baseCompletion,
-    bonusPoints,
-    finalCompletion
-  })
 
   return finalCompletion
 }

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GEMINI_MODEL_NAME } from "@/lib/ai-model"
 
-const MODEL_NAME = "gemini-2.5-flash"  // Updated to use Gemini 2.5 Flash
+const MODEL_NAME = GEMINI_MODEL_NAME
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY
 
 // Only initialize if API key is available
@@ -12,6 +13,109 @@ if (API_KEY) {
   model = genAI.getGenerativeModel({ 
   model: MODEL_NAME,
 })
+}
+
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 503, 504])
+const MAX_ATTEMPTS_PER_MODEL = 3
+const BASE_RETRY_DELAY_MS = 1200
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function getErrorStatusCode(error: unknown): number | null {
+  if (!error || typeof error !== "object") return null
+
+  const asRecord = error as Record<string, unknown>
+  const directStatus = asRecord.status
+  if (typeof directStatus === "number") return directStatus
+
+  const maybeError = asRecord.error
+  if (maybeError && typeof maybeError === "object") {
+    const nestedStatus = (maybeError as Record<string, unknown>).status
+    if (typeof nestedStatus === "number") return nestedStatus
+  }
+
+  return null
+}
+
+function isRetryableGeminiError(error: unknown): boolean {
+  const statusCode = getErrorStatusCode(error)
+  if (statusCode !== null && RETRYABLE_STATUS_CODES.has(statusCode)) {
+    return true
+  }
+
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+  return (
+    message.includes("high demand") ||
+    message.includes("try again later") ||
+    message.includes("temporarily unavailable") ||
+    message.includes("503")
+  )
+}
+
+async function generateWithRetry(prompt: string) {
+  if (!genAI) {
+    throw new Error("Gemini API not initialized - missing API key")
+  }
+
+  let lastError: unknown = null
+
+  const activeModel = genAI.getGenerativeModel({ model: MODEL_NAME })
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
+    try {
+      console.log(`📡 Calling Gemini model "${MODEL_NAME}" (attempt ${attempt}/${MAX_ATTEMPTS_PER_MODEL})`)
+      const result = await activeModel.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      })
+      return result
+    } catch (error) {
+      lastError = error
+      const shouldRetry = isRetryableGeminiError(error) && attempt < MAX_ATTEMPTS_PER_MODEL
+
+      if (!shouldRetry) {
+        console.error(`❌ Gemini model "${MODEL_NAME}" failed on attempt ${attempt}`, error)
+        break
+      }
+
+      const jitterMs = Math.floor(Math.random() * 350)
+      const backoffMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1) + jitterMs
+      console.warn(
+        `⚠️ Transient Gemini error on "${MODEL_NAME}" (attempt ${attempt}); retrying in ${backoffMs}ms...`,
+        error
+      )
+      await sleep(backoffMs)
+    }
+  }
+
+  throw new Error(
+    `Gemini API unavailable after retrying model "${MODEL_NAME}": ${
+      lastError instanceof Error ? lastError.message : "Unknown error"
+    }`
+  )
+}
+
+function getFallbackSuggestionsForField(fieldName: string): string[] {
+  const fieldOptions = FIELD_OPTIONS[fieldName as keyof typeof FIELD_OPTIONS]
+  if (!fieldOptions) return []
+  const options = Array.isArray(fieldOptions) ? fieldOptions : Object.values(fieldOptions)
+  return options.slice(0, 3).map(String)
+}
+
+function buildFallbackGuidanceResponse(fieldName: string): string {
+  const suggestions = getFallbackSuggestionsForField(fieldName)
+  const guidance =
+    "I am seeing temporary high demand right now, but you can keep going with these quick options while I reconnect.\n\n" +
+    "- Pick one of the suggestions below and I can refine it in your next message.\n" +
+    "- If none fit, tell me your top priority and I will tailor recommendations.\n" +
+    "- You can retry in a few seconds for a full AI-generated response."
+
+  if (suggestions.length === 0) {
+    return guidance
+  }
+
+  return `${guidance}\n\nSUGGESTIONS: [${suggestions.join(", ")}]`
 }
 
 interface Message {
@@ -302,16 +406,11 @@ Do not forget the SUGGESTIONS line - it is mandatory for all responses.`
 
     console.log("📄 Full prompt length:", fullPrompt.length)
     console.log("🔑 API Key exists:", !!API_KEY)
-    console.log("🤖 Model name:", MODEL_NAME)
+    console.log("🤖 Model:", MODEL_NAME)
 
     console.log("📡 Making API call...")
     console.log("🔍 Full prompt being sent:", fullPrompt)
-    const result = await model.generateContent({
-      contents: [{ 
-        role: "user",
-        parts: [{ text: fullPrompt }] 
-      }],
-    })
+    const result = await generateWithRetry(fullPrompt)
     
     console.log("✅ API call completed")
     const response = await result.response
@@ -330,6 +429,13 @@ Do not forget the SUGGESTIONS line - it is mandatory for all responses.`
     
     return responseText
   } catch (error) {
+    if (isRetryableGeminiError(error)) {
+      console.warn("⚠️ Gemini transient error in getProfileGuidanceResponse, returning graceful fallback.", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      })
+      return buildFallbackGuidanceResponse(fieldName)
+    }
+
     console.error("❌ Error in getProfileGuidanceResponse:", error)
     console.error("🔍 Error details:", {
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -504,12 +610,7 @@ Return your response in a clear, structured format that can be easily displayed 
     console.log("📄 Full prompt length:", prompt.length)
     console.log("🔑 API Key exists:", !!API_KEY)
 
-    const result = await model.generateContent({
-      contents: [{ 
-        role: "user",
-        parts: [{ text: prompt }] 
-      }],
-    })
+    const result = await generateWithRetry(prompt)
     
     console.log("✅ API call completed")
     const response = await result.response
@@ -530,12 +631,9 @@ export async function testGeminiAPI(): Promise<string> {
       throw new Error("Gemini API not initialized - missing API key")
     }
 
-    const result = await model.generateContent({
-      contents: [{ 
-        role: "user",
-        parts: [{ text: "Hello! Please respond with a simple test message to confirm the Gemini API is working correctly." }] 
-      }],
-    })
+    const result = await generateWithRetry(
+      "Hello! Please respond with a simple test message to confirm the Gemini API is working correctly."
+    )
     
     const response = await result.response
     return response.text()

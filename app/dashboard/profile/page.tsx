@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { ProfileClient } from "./profile-client"
 import { CoachProfile } from "@/components/profile/coach-profile"
+import { StudentAISidebarShell } from "@/components/student/student-ai-sidebar-shell"
 
 export default async function ProfilePage() {
   try {
@@ -38,9 +39,11 @@ export default async function ProfilePage() {
       return (
         <div className="bg-gradient-to-br from-[#E5E7E8] via-[#f5f6f7] to-[#E5E7E8] min-h-screen">
           <DashboardHeader user={user} />
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
-            <ProfileClient user={user} />
-          </div>
+          <StudentAISidebarShell enabled={true}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
+              <ProfileClient user={user} />
+            </div>
+          </StudentAISidebarShell>
         </div>
       )
     }

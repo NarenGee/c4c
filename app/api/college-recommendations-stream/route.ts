@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { GEMINI_MODEL_NAME } from "@/lib/ai-model"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 export async function POST(request: NextRequest) {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
           
           const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
           const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
+            model: GEMINI_MODEL_NAME,
             generationConfig: {
               temperature: 0.3,
               topP: 0.8,

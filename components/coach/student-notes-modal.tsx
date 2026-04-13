@@ -88,8 +88,8 @@ export function StudentNotesModal({ studentId, studentName, onNotesUpdated }: St
     return Object.values(conversations)
   }
 
-  const loadNotes = async () => {
-    if (notesLoaded) return
+  const loadNotes = async (forceRefresh = false) => {
+    if (notesLoaded && !forceRefresh) return
     
     setLoading(true)
     try {
@@ -129,8 +129,7 @@ export function StudentNotesModal({ studentId, studentName, onNotesUpdated }: St
       
           if (data.success) {
             // Reload notes
-            setNotesLoaded(false)
-            await loadNotes()
+            await loadNotes(true)
 
             // Reset form
             setNewNote({
@@ -168,8 +167,7 @@ export function StudentNotesModal({ studentId, studentName, onNotesUpdated }: St
       
       if (data.success) {
         // Reload notes
-        setNotesLoaded(false)
-        await loadNotes()
+        await loadNotes(true)
         onNotesUpdated?.()
       } else {
         console.error("Failed to update note visibility:", data.error)
@@ -222,8 +220,7 @@ export function StudentNotesModal({ studentId, studentName, onNotesUpdated }: St
 
       if (data.success) {
         // Reload notes
-        setNotesLoaded(false)
-        await loadNotes()
+        await loadNotes(true)
         onNotesUpdated?.()
       } else {
         console.error("Failed to add reply:", data.error)
@@ -239,8 +236,40 @@ export function StudentNotesModal({ studentId, studentName, onNotesUpdated }: St
 
   const handleMessageAdded = () => {
     // Reload notes from backend to get the latest data
-    setNotesLoaded(false)
-    loadNotes()
+    loadNotes(true)
+  }
+
+  const handleDeleteNote = async (noteId: string) => {
+    const confirmed = window.confirm("Delete this note and its replies? This action cannot be undone.")
+    if (!confirmed) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/coach/students/${studentId}/notes`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteId })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        await loadNotes(true)
+        onNotesUpdated?.()
+
+        if (selectedConversation?.note.id === noteId) {
+          closeConversation()
+        }
+      } else {
+        console.error("Failed to delete note:", data.error)
+        alert(`Error: ${data.error}`)
+      }
+    } catch (error) {
+      console.error("Error deleting note:", error)
+      alert("Failed to delete note")
+    } finally {
+      setLoading(false)
+    }
   }
 
 
@@ -370,6 +399,15 @@ export function StudentNotesModal({ studentId, studentName, onNotesUpdated }: St
                                 className="text-xs"
                               >
                                 {conversation.note.visible_to_student ? "Make Private" : "Make Visible"}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteNote(conversation.note.id)}
+                                disabled={loading}
+                                className="text-xs"
+                              >
+                                Delete
                               </Button>
                             </div>
                           </div>

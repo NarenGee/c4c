@@ -68,7 +68,7 @@ export async function GET(
     // Fetch student profile (handle multiple records)
     const { data: profiles, error: profileError } = await adminClient
       .from("student_profiles")
-      .select("*")
+      .select("grade_level, gpa, sat_score, act_score, interests, preferred_majors, budget_range, location_preferences, country_of_residence, state_province, college_size, campus_setting, class_rank, grading_system, a_level_subjects, ib_subjects, ib_total_points, extracurricular_details, college_preferences, dream_colleges, preferred_countries")
       .eq("user_id", params.studentId)
       .order("updated_at", { ascending: false })
 

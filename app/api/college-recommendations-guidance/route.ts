@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
+import { GEMINI_MODEL_NAME } from "@/lib/ai-model"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
-const MODEL_NAME = "gemini-2.5-flash"
+const MODEL_NAME = GEMINI_MODEL_NAME
 
 interface Message {
   role: string

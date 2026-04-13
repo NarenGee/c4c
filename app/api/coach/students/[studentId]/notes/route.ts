@@ -356,3 +356,120 @@ export async function PATCH(
     )
   }
 }
+
+// DELETE - Delete a note (and its replies)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ studentId: string }> }
+) {
+  try {
+    const { studentId } = await params
+    const supabase = await createClient()
+    const adminClient = createAdminClient()
+
+    // Get auth user
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized - Not logged in" },
+        { status: 401 }
+      )
+    }
+
+    // Get user profile
+    const { data: user, error: userError } = await adminClient
+      .from("users")
+      .select("id, email, full_name, role, \"current_role\"")
+      .eq("id", authUser.id)
+      .single()
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { success: false, error: "User profile not found" },
+        { status: 404 }
+      )
+    }
+
+    // Check if user is a coach or super_admin
+    const isAuthorized = user.current_role === "coach" ||
+                        user.current_role === "super_admin" ||
+                        user.role === "coach" ||
+                        user.role === "super_admin"
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized - Coach or admin access required" },
+        { status: 401 }
+      )
+    }
+
+    // If coach, verify they have access to this student
+    if (user.current_role === "coach" || user.role === "coach") {
+      const { data: assignment } = await adminClient
+        .from("coach_student_assignments")
+        .select("id")
+        .eq("coach_id", user.id)
+        .eq("student_id", studentId)
+        .eq("is_active", true)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { success: false, error: "Unauthorized - No access to this student" },
+          { status: 403 }
+        )
+      }
+    }
+
+    const body = await request.json()
+    const { noteId } = body
+
+    if (!noteId) {
+      return NextResponse.json(
+        { success: false, error: "Missing required field: noteId" },
+        { status: 400 }
+      )
+    }
+
+    // Delete child replies first so parent delete is safe regardless of FK configuration.
+    const { error: repliesDeleteError } = await adminClient
+      .from("student_notes")
+      .delete()
+      .eq("student_id", studentId)
+      .eq("parent_note_id", noteId)
+
+    if (repliesDeleteError) {
+      console.error("Error deleting note replies:", repliesDeleteError)
+      return NextResponse.json(
+        { success: false, error: "Failed to delete note replies" },
+        { status: 500 }
+      )
+    }
+
+    const { error: noteDeleteError } = await adminClient
+      .from("student_notes")
+      .delete()
+      .eq("id", noteId)
+      .eq("student_id", studentId)
+
+    if (noteDeleteError) {
+      console.error("Error deleting note:", noteDeleteError)
+      return NextResponse.json(
+        { success: false, error: "Failed to delete note" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Note deleted successfully"
+    })
+  } catch (error: any) {
+    console.error("Error in DELETE /api/coach/students/[studentId]/notes:", error)
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    )
+  }
+}

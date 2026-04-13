@@ -228,27 +228,25 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
     if (!isOpen) return
     
     setLoading(true)
+    const startedAt = performance.now()
     try {
-      // Load student profile
-      const profileResponse = await fetch(`/api/coach/students/${studentId}/profile`)
-      const profileData = await profileResponse.json()
-      
+      const [profileResponse, appsResponse, matchesResponse] = await Promise.all([
+        fetch(`/api/coach/students/${studentId}/profile`),
+        fetch(`/api/coach/students/${studentId}/applications`),
+        fetch(`/api/coach/students/${studentId}/matches`),
+      ])
+      const [profileData, appsData, matchesData] = await Promise.all([
+        profileResponse.json(),
+        appsResponse.json(),
+        matchesResponse.json(),
+      ])
+
       if (profileData.success) {
         setProfile(profileData.profile)
       }
-
-      // Load student applications
-      const appsResponse = await fetch(`/api/coach/students/${studentId}/applications`)
-      const appsData = await appsResponse.json()
-      
       if (appsData.success) {
         setApplications(appsData.applications || [])
       }
-
-      // Load student matches
-      const matchesResponse = await fetch(`/api/coach/students/${studentId}/matches`)
-      const matchesData = await matchesResponse.json()
-      
       if (matchesData.success) {
         setMatches(matchesData.matches || [])
       }
@@ -256,6 +254,7 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
     } catch (error) {
       console.error("Error loading student data:", error)
     } finally {
+      console.info(`[perf] student modal ${studentId} loaded in ${Math.round(performance.now() - startedAt)}ms`)
       setLoading(false)
     }
   }

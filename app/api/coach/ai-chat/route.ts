@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { GEMINI_MODEL_NAME } from "@/lib/ai-model"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 // Initialize Gemini AI (using the same env var as other parts of the app)
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "")
+const MODEL_NAME = GEMINI_MODEL_NAME
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 503, 504])
+const MAX_ATTEMPTS_PER_MODEL = 3
+const BASE_RETRY_DELAY_MS = 1200
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -42,6 +47,65 @@ interface StudentContext {
     totalApplications: number
     studentsNeedingAttention: number
   }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function getErrorStatusCode(error: unknown): number | null {
+  if (!error || typeof error !== "object") return null
+  const asRecord = error as Record<string, unknown>
+  const directStatus = asRecord.status
+  if (typeof directStatus === "number") return directStatus
+  const maybeError = asRecord.error
+  if (maybeError && typeof maybeError === "object") {
+    const nestedStatus = (maybeError as Record<string, unknown>).status
+    if (typeof nestedStatus === "number") return nestedStatus
+  }
+  return null
+}
+
+function isRetryableGeminiError(error: unknown): boolean {
+  const statusCode = getErrorStatusCode(error)
+  if (statusCode !== null && RETRYABLE_STATUS_CODES.has(statusCode)) return true
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+  return (
+    message.includes("high demand") ||
+    message.includes("try again later") ||
+    message.includes("temporarily unavailable") ||
+    message.includes("service unavailable") ||
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("429") ||
+    message.includes("503")
+  )
+}
+
+async function generateWithModelFallback(prompt: string) {
+  let lastError: unknown = null
+  const model = genAI.getGenerativeModel({ model: MODEL_NAME })
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
+    try {
+      const result = await model.generateContent(prompt)
+      return { result, modelName: MODEL_NAME }
+    } catch (error: any) {
+      lastError = error
+      const msg = error?.message ?? String(error)
+      const shouldRetry = isRetryableGeminiError(error) && attempt < MAX_ATTEMPTS_PER_MODEL
+      if (!shouldRetry) {
+        console.warn(`AI chat model failed (${MODEL_NAME}):`, msg)
+        break
+      }
+      const jitterMs = Math.floor(Math.random() * 350)
+      const backoffMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1) + jitterMs
+      console.warn(
+        `Transient AI error for ${MODEL_NAME} (attempt ${attempt}/${MAX_ATTEMPTS_PER_MODEL}), retrying in ${backoffMs}ms`
+      )
+      await sleep(backoffMs)
+    }
+  }
+  throw lastError ?? new Error(`AI model ${MODEL_NAME} unavailable`)
 }
 
 // Helper function to fetch comprehensive student data
@@ -184,6 +248,24 @@ export async function POST(request: NextRequest) {
     const message = body?.message
     const rawStudentContext = body?.studentContext
     const conversationHistory = body?.conversationHistory
+    const adminClient = createAdminClient()
+
+    // Build assignment allow-list for the authenticated coach.
+    const { data: assignments, error: assignmentsError } = await adminClient
+      .from("coach_student_assignments")
+      .select("student_id")
+      .eq("coach_id", user.id)
+      .eq("is_active", true)
+
+    if (assignmentsError) {
+      console.error("Failed to load coach assignments:", assignmentsError)
+      return NextResponse.json(
+        { success: false, error: "Unable to verify student access" },
+        { status: 500 }
+      )
+    }
+
+    const assignedStudentIds = new Set((assignments || []).map((a: { student_id: string }) => a.student_id))
 
     // Ensure we have a valid student context (default to minimal structure to avoid crashes)
     const studentContext = rawStudentContext && typeof rawStudentContext === 'object'
@@ -207,7 +289,9 @@ export async function POST(request: NextRequest) {
                           /\b(ethan|ayesh|flavion|senara|[A-Z][a-z]+)'s\s+(preferences|profile|colleges|applications|recommendations|grades|scores|major|test scores|gpa|sat|act|dream colleges|intended major)/i.test(message)
 
     // Debug logging
-    const overview = studentContext.studentsOverview || []
+    const overview = (studentContext.studentsOverview || []).filter(
+      (s: { id?: string }) => !!s?.id && assignedStudentIds.has(s.id)
+    )
     console.log("Query analysis:", {
       message,
       isFactualQuery,
@@ -260,10 +344,19 @@ export async function POST(request: NextRequest) {
     const requestsDetailedInfo = /profile|preferences|recommendations|applications|notes|details|overview/i.test(message)
     
     if (resolvedStudent || requestsDetailedInfo || isFactualQuery) {
-      const adminClient = createAdminClient()
-      
       if (resolvedStudent) {
         console.log("Looking for student:", resolvedStudent.name)
+        try {
+          if (!assignedStudentIds.has(resolvedStudent.id)) {
+            console.warn("Blocked detailed fetch for unassigned student:", resolvedStudent.id)
+            resolvedStudent = null
+          }
+        } catch (error) {
+          console.log("Could not verify student assignment:", error)
+        }
+      }
+
+      if (resolvedStudent) {
         try {
           const comprehensiveData = await fetchComprehensiveStudentData(adminClient, resolvedStudent.id, resolvedStudent.name)
           if (comprehensiveData) {
@@ -281,7 +374,7 @@ export async function POST(request: NextRequest) {
       else if (requestsDetailedInfo) {
         try {
           const allStudentsData = []
-          for (const student of studentContext.studentsOverview.slice(0, 3)) { // Limit to 3 students for token management
+          for (const student of overview.slice(0, 3)) { // Limit to 3 students for token management
             const comprehensiveData = await fetchComprehensiveStudentData(adminClient, student.id, student.name)
             if (comprehensiveData) {
               allStudentsData.push(comprehensiveData)
@@ -428,8 +521,6 @@ TONE:
 - For factual queries: Clear, informative, data-focused
 - For coaching queries: Professional yet approachable, like a mentor in a quick strategy session`
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
-
     // Build conversation history for context
     const conversationContext = conversationHistory
       ?.slice(-10) // Keep last 10 messages for context
@@ -482,7 +573,23 @@ If COACHING QUERY:
 FOR THIS QUERY "${message}":
 ${treatAsNotesSummary ? 'This is a NOTES SUMMARY QUERY - use ONLY the NOTES SECTION. Each bullet must be on its own line. Under Summary, output 3-5 separate lines each starting with "- " (one key point per line). Do NOT write the summary as one paragraph. If no notes, say so clearly.' : isFactualQuery ? 'This is a FACTUAL QUERY - provide data only, no coaching advice. Format with bullet points and clear **bold** sections.' : 'This is a COACHING QUERY - provide strategic guidance as Dr. Sarah Chen. Use bullet points for priorities and action items.'}`
 
-    const result = await model.generateContent(fullPrompt)
+    let result: any
+    let modelName = MODEL_NAME
+    try {
+      const generation = await generateWithModelFallback(fullPrompt)
+      result = generation.result
+      modelName = generation.modelName
+    } catch (error) {
+      if (isRetryableGeminiError(error)) {
+        return NextResponse.json({
+          success: true,
+          response:
+            "I'm seeing temporary high demand from the AI provider. Please retry in a moment, or ask a narrower question (for example, one student or one data section) and I can continue."
+        })
+      }
+      throw error
+    }
+    console.info("AI chat used model:", modelName)
     const geminiResponse = result.response
 
     // Handle empty or blocked responses (avoid .text() throwing)
@@ -520,9 +627,9 @@ ${treatAsNotesSummary ? 'This is a NOTES SUMMARY QUERY - use ONLY the NOTES SECT
         { status: 503 }
       )
     }
-    if (msg.includes("404") || msg.includes("not found") || msg.includes("model")) {
+    if (msg.includes("404") || msg.includes("not found") || msg.includes("unsupported model")) {
       return NextResponse.json(
-        { success: false, error: "AI model is temporarily unavailable. Please try again later." },
+        { success: false, error: "AI model configuration error: the selected model is unavailable or unsupported. Please update the configured model list." },
         { status: 503 }
       )
     }

@@ -69,15 +69,9 @@ export async function GET(
     // Fetch student college matches
     const { data: matches, error: matchesError } = await adminClient
       .from("college_matches")
-      .select("*")
+      .select("id, student_id, college_name, match_score, admission_chance, justification, source_links, country, city, program_type, estimated_cost, admission_requirements, acceptance_rate, student_count, campus_setting, tuition_annual, match_reasons, website_url, fit_category, generated_at, is_dream_college")
       .eq("student_id", studentId)
       .order("match_score", { ascending: false })
-      
-    console.log(`🎯 Matches query:`, {
-      found: matches?.length || 0,
-      error: matchesError,
-      studentId: studentId
-    })
 
     if (matchesError) {
       console.error("Error fetching matches:", matchesError)

@@ -21,7 +21,7 @@ create table gemini_logs (
   student_id uuid references users(id) on delete cascade,
   prompt_text text not null,
   response_text text,
-  model_used text default 'gemini-2.5-flash',
+  model_used text,
   tokens_used integer,
   processing_time_ms integer,
   success boolean default true,

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -60,6 +61,7 @@ interface ChatSession {
 
 const SIDEBAR_WIDTH_MIN = 320
 const SIDEBAR_WIDTH_MAX = 900
+const LEGACY_STORAGE_KEY = "coach-ai-chat-sessions"
 
 interface AIChatAssistantProps {
   students: CoachStudent[]
@@ -182,6 +184,7 @@ export function AIChatAssistant({ students, isOpen, onToggle, sidebarWidth = 384
   const [message, setMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -197,9 +200,31 @@ export function AIChatAssistant({ students, isOpen, onToggle, sidebarWidth = 384
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      const supabase = createClient()
+      const { data } = await supabase.auth.getUser()
+      setCurrentUserId(data.user?.id ?? null)
+    }
+    void loadCurrentUser()
+  }, [])
+
+  const storageKey = currentUserId ? `${LEGACY_STORAGE_KEY}:${currentUserId}` : null
+
   // Load chat sessions from localStorage on mount
   useEffect(() => {
-    const savedSessions = localStorage.getItem('coach-ai-chat-sessions')
+    if (!storageKey) return
+
+    let savedSessions = localStorage.getItem(storageKey)
+    if (!savedSessions) {
+      const legacySessions = localStorage.getItem(LEGACY_STORAGE_KEY)
+      if (legacySessions) {
+        localStorage.setItem(storageKey, legacySessions)
+        localStorage.removeItem(LEGACY_STORAGE_KEY)
+        savedSessions = legacySessions
+      }
+    }
+
     if (savedSessions) {
       const sessions = JSON.parse(savedSessions).map((session: any) => ({
         ...session,
@@ -218,14 +243,17 @@ export function AIChatAssistant({ students, isOpen, onToggle, sidebarWidth = 384
         setShowSuggestions(sessions[0].messages.length === 0)
       }
     }
-  }, [])
+  }, [storageKey])
 
   // Save sessions to localStorage whenever they change
   useEffect(() => {
-    if (chatSessions.length > 0) {
-      localStorage.setItem('coach-ai-chat-sessions', JSON.stringify(chatSessions))
+    if (!storageKey) return
+    if (chatSessions.length === 0) {
+      localStorage.removeItem(storageKey)
+      return
     }
-  }, [chatSessions])
+    localStorage.setItem(storageKey, JSON.stringify(chatSessions))
+  }, [chatSessions, storageKey])
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -457,7 +485,9 @@ export function AIChatAssistant({ students, isOpen, onToggle, sidebarWidth = 384
     setChatSessions([])
     setCurrentSession(null)
     setShowSuggestions(true)
-    localStorage.removeItem('coach-ai-chat-sessions')
+    if (storageKey) {
+      localStorage.removeItem(storageKey)
+    }
   }
 
   if (!isOpen) {

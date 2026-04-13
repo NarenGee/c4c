@@ -47,6 +47,8 @@ import {
 } from "lucide-react";
 import type { User } from "@/lib/auth";
 import Link from "next/link";
+import { AIStudentChatAssistant } from "@/components/student/ai-student-chat-assistant";
+import { useStudentSidebar } from "@/components/dashboard/dashboard-shell";
 
 interface StudentDashboardProps {
   user: User;
@@ -108,6 +110,32 @@ interface TimelinePhase {
 }
 
 export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
+  const studentSidebar = useStudentSidebar();
+  const [localOpen, setLocalOpen] = useState(false);
+  const [localWidth, setLocalWidth] = useState(384);
+
+  const isAIChatOpen = studentSidebar ? studentSidebar.isOpen : localOpen;
+  const setAIChatOpen = studentSidebar ? studentSidebar.setIsOpen : setLocalOpen;
+  const sidebarWidth = studentSidebar ? studentSidebar.width : localWidth;
+  const handleSidebarWidthChange = studentSidebar
+    ? studentSidebar.setWidth
+    : (w: number) => {
+        setLocalWidth(w);
+        if (typeof window !== "undefined") localStorage.setItem("student-ai-sidebar-width", String(w));
+      };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("student-ai-sidebar-width");
+    if (stored) {
+      const n = parseInt(stored, 10);
+      if (!isNaN(n) && n >= 320 && n <= 900) {
+        setLocalWidth(n);
+      }
+    }
+    setLocalOpen(window.innerWidth >= 1024);
+  }, []);
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
   const [newNoteType, setNewNoteType] = useState<'note' | 'action'>('note');
@@ -140,6 +168,12 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
     };
     initializeData();
   }, []);
+
+  useEffect(() => {
+    if (studentSidebar && typeof window !== "undefined" && window.innerWidth >= 1024) {
+      studentSidebar.setIsOpen(true);
+    }
+  }, [studentSidebar]);
 
   // Auto-save task states to backend (but not on initial load)
   useEffect(() => {
@@ -1939,6 +1973,12 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
           </Tabs>
         </div>
       </div>
+      <AIStudentChatAssistant
+        isOpen={isAIChatOpen}
+        onToggle={() => setAIChatOpen(!isAIChatOpen)}
+        sidebarWidth={sidebarWidth}
+        onSidebarWidthChange={handleSidebarWidthChange}
+      />
     </div>
   );
 }

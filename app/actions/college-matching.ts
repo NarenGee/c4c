@@ -2,6 +2,7 @@
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth"
+import { GEMINI_MODEL_NAME } from "@/lib/ai-model"
 import { generateText } from "ai"  
 import { google } from "@ai-sdk/google"
 import { GoogleGenerativeAI } from "@google/generative-ai"
@@ -576,7 +577,7 @@ Requirements:
     // Optimized model configuration for faster responses
     let maxTokens = 16000 // Reduced from 32000 for faster processing
     let model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: GEMINI_MODEL_NAME,
       generationConfig: {
         temperature: 0.3, // Increased for more consistent, faster responses
         topP: 0.8, // Reduced for faster processing
@@ -615,7 +616,7 @@ Requirements:
           console.log(`Response too short (${text.length} chars), reducing max tokens from ${maxTokens} to ${maxTokens / 2}`)
           maxTokens = maxTokens / 2
           model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
+            model: GEMINI_MODEL_NAME,
             generationConfig: {
               temperature: 0.1,
               topP: 0.9,
@@ -886,7 +887,7 @@ export async function fetchDreamCollegeDetails(collegeName: string, profile: Stu
     }
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME })
 
     const prompt = `You are a college admissions consultant. Analyze ${collegeName} specifically for this student profile and provide a detailed match assessment.
 
