@@ -44,6 +44,7 @@ import {
   Edit3,
   Star,
   AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 import type { User } from "@/lib/auth";
 import Link from "next/link";
@@ -153,6 +154,11 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const savedTaskStatesRef = useRef<any[]>([]);
   const isInitializedRef = useRef(false);
+  const [playbookStatus, setPlaybookStatus] = useState<{
+    hasInProgress: boolean;
+    hasCompleted: boolean;
+    currentStep?: number;
+  }>({ hasInProgress: false, hasCompleted: false });
 
   // Load initial data
   useEffect(() => {
@@ -206,6 +212,7 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
       console.error('Error loading saved task states:', error);
     }
   };
+
 
   const loadSavedNotes = async () => {
     try {
@@ -271,6 +278,26 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
   const loadStudentData = async () => {
     // Load notes from backend - no mock data needed
     // Notes will be loaded by loadSavedNotes() which is called in useEffect
+
+    let playbookCompleted = false;
+    let playbookInProgress = false;
+    let playbookCurrentStep: number | undefined;
+    try {
+      const response = await fetch("/api/student/priority-playbook");
+      if (response.ok) {
+        const data = await response.json();
+        playbookCompleted = !!data.completed;
+        playbookInProgress = !!data.inProgress;
+        playbookCurrentStep = data.inProgress?.current_step;
+        setPlaybookStatus({
+          hasInProgress: playbookInProgress,
+          hasCompleted: playbookCompleted,
+          currentStep: playbookCurrentStep,
+        });
+      }
+    } catch (error) {
+      console.error("Error loading playbook status:", error);
+    }
 
     setTimelinePhases([
       {
@@ -636,6 +663,16 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
         status: 'not_started' as const,
         autoDerived: false,
       },
+      {
+        id: "6",
+        title: "Complete Priority Playbook",
+        description: "Work through the live workshop to prioritize your goals and tasks",
+        completed: false,
+        href: "/priority-playbook",
+        icon: ClipboardList,
+        status: 'not_started' as const,
+        autoDerived: true,
+      },
     ];
     
     // Apply saved states from ref if they exist
@@ -648,6 +685,9 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
           completed: savedState.completed,
           status: savedState.status
         };
+      }
+      if (task.id === "6" && playbookCompleted) {
+        return { ...task, completed: true, status: 'completed' as const };
       }
       return task;
     });
@@ -1090,6 +1130,33 @@ export function EnhancedStudentDashboard({ user }: StudentDashboardProps) {
 
             {/* Home Tab */}
             <TabsContent value="home" className="space-y-6">
+              <Card className="relative rounded-xl shadow-lg bg-gradient-to-br from-teal-50 via-white to-teal-100 border border-teal-200">
+                <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <ClipboardList className="h-8 w-8 text-teal-700 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg">Priority Playbook</h3>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {playbookStatus.hasCompleted
+                          ? "You've completed your playbook. Review your priorities or start a new session."
+                          : playbookStatus.hasInProgress
+                          ? `Continue your workshop — you're on step ${playbookStatus.currentStep ?? 1} of 9.`
+                          : "Cut out the noise. Do what matters. Start the live workshop exercise."}
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/priority-playbook">
+                    <Button className="bg-teal-700 hover:bg-teal-800 whitespace-nowrap">
+                      {playbookStatus.hasCompleted
+                        ? "View Playbook"
+                        : playbookStatus.hasInProgress
+                        ? "Continue Playbook"
+                        : "Start Playbook"}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
               <Card className="relative rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl bg-gradient-to-br from-blue-50 via-white to-blue-100 border border-blue-100 overflow-visible">
                 <CardHeader className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-xl sm:rounded-t-2xl shadow-md">
                   <CardTitle className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold tracking-wide leading-tight">

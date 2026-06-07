@@ -20,6 +20,7 @@ import {
   Menu, 
   X,
   ChevronDown,
+  ClipboardList,
   Shield,
   Users
 } from "lucide-react"
@@ -128,6 +129,13 @@ const getNavigationItems = (userRole: string) => {
       icon: BookOpen,
       description: "Track application progress",
       color: "text-orange-600"
+    },
+    {
+      name: "Priority Playbook",
+      href: "/priority-playbook",
+      icon: ClipboardList,
+      description: "Workshop prioritization tool",
+      color: "text-teal-600"
     }
   ]
 }

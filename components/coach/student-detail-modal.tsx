@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { CoachPlaybookView, CoachPlaybookEmpty } from "@/components/priority-playbook/coach-playbook-view"
+import type { PriorityPlaybookSession } from "@/lib/priority-playbook/types"
 import { 
   Eye, 
   GraduationCap, 
@@ -206,6 +208,8 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [applications, setApplications] = useState<CollegeApplication[]>([])
   const [matches, setMatches] = useState<CollegeMatch[]>([])
+  const [playbookSession, setPlaybookSession] = useState<PriorityPlaybookSession | null>(null)
+  const [playbookLoaded, setPlaybookLoaded] = useState(false)
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set())
   const [matchDetails, setMatchDetails] = useState<Record<string, any>>({})
   const [matchFilters, setMatchFilters] = useState({
@@ -230,15 +234,17 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
     setLoading(true)
     const startedAt = performance.now()
     try {
-      const [profileResponse, appsResponse, matchesResponse] = await Promise.all([
+      const [profileResponse, appsResponse, matchesResponse, playbookResponse] = await Promise.all([
         fetch(`/api/coach/students/${studentId}/profile`),
         fetch(`/api/coach/students/${studentId}/applications`),
         fetch(`/api/coach/students/${studentId}/matches`),
+        fetch(`/api/coach/students/${studentId}/priority-playbook`),
       ])
-      const [profileData, appsData, matchesData] = await Promise.all([
+      const [profileData, appsData, matchesData, playbookData] = await Promise.all([
         profileResponse.json(),
         appsResponse.json(),
         matchesResponse.json(),
+        playbookResponse.json(),
       ])
 
       if (profileData.success) {
@@ -250,6 +256,10 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
       if (matchesData.success) {
         setMatches(matchesData.matches || [])
       }
+      if (playbookData.success) {
+        setPlaybookSession(playbookData.session ?? null)
+      }
+      setPlaybookLoaded(true)
 
     } catch (error) {
       console.error("Error loading student data:", error)
@@ -505,7 +515,7 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
             <div className="text-center py-8">Loading student data...</div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 mb-6 h-auto">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 mb-6 h-auto">
                 <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-2">
                   <span className="hidden sm:inline">Overview</span>
                   <span className="sm:hidden">Overview</span>
@@ -525,6 +535,10 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
                 <TabsTrigger value="applications" className="text-xs sm:text-sm px-2 py-2">
                   <span className="hidden sm:inline">Applications ({applications.length})</span>
                   <span className="sm:hidden">Apps ({applications.length})</span>
+                </TabsTrigger>
+                <TabsTrigger value="playbook" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden sm:inline">Priority Playbook</span>
+                  <span className="sm:hidden">Playbook</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -1370,6 +1384,29 @@ export function StudentDetailModal({ studentId, studentName, defaultTab = "overv
                         )
                       })}
                     </Accordion>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="playbook" className="space-y-4">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader className="bg-slate-100 border-b">
+                    <CardTitle className="text-slate-800 flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Priority Playbook
+                    </CardTitle>
+                    <CardDescription className="text-slate-600">
+                      Completed workshop responses (read-only)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {!playbookLoaded ? (
+                      <div className="text-center py-8 text-slate-500">Loading playbook...</div>
+                    ) : playbookSession ? (
+                      <CoachPlaybookView session={playbookSession} studentName={studentName} />
+                    ) : (
+                      <CoachPlaybookEmpty />
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

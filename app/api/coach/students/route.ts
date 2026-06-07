@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
       collegeByStudentIdResult,
       collegeByUserIdResult,
       authUsersResult,
+      playbookResult,
     ] = await Promise.all([
       adminClient
         .from("users")
@@ -113,6 +114,11 @@ export async function GET(request: NextRequest) {
           }
         })
       ),
+      adminClient
+        .from("priority_playbook_sessions")
+        .select("student_id, status, completed_at")
+        .in("student_id", studentIds)
+        .eq("status", "completed"),
     ])
     const queryMs = Date.now() - queryStart
 
@@ -210,6 +216,10 @@ export async function GET(request: NextRequest) {
     }
 
     const authByStudentId = new Map(authUsersResult)
+    const playbookCompleteByStudentId = new Set<string>()
+    for (const row of playbookResult.data ?? []) {
+      playbookCompleteByStudentId.add(row.student_id)
+    }
     const responseBuildStart = Date.now()
     const students = studentIds
       .map((studentId) => {
@@ -252,6 +262,7 @@ export async function GET(request: NextRequest) {
           },
           assigned_at: assignmentByStudentId.get(studentId)?.assigned_at,
           last_sign_in_at: authByStudentId.get(studentId) ?? null,
+          playbook_complete: playbookCompleteByStudentId.has(studentId),
         }
       })
       .filter(Boolean)

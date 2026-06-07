@@ -42,6 +42,7 @@ interface CoachStudent {
   }
   assigned_at: string
   last_sign_in_at?: string
+  playbook_complete?: boolean
 }
 
 interface CoachDashboardProps {
@@ -259,6 +260,18 @@ export function CoachDashboard({ user }: CoachDashboardProps) {
                               {student.college_list_count} colleges in application list
                             </Badge>
                           </StudentDetailModal>
+                          <StudentDetailModal studentId={student.id} studentName={student.full_name} defaultTab="playbook">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs cursor-pointer transition-colors ${
+                                student.playbook_complete
+                                  ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                                  : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                              }`}
+                            >
+                              {student.playbook_complete ? "Playbook complete" : "Playbook not started"}
+                            </Badge>
+                          </StudentDetailModal>
                         </div>
                       </div>
                     </div>
@@ -329,6 +342,18 @@ export function CoachDashboard({ user }: CoachDashboardProps) {
                                 <StudentDetailModal studentId={student.id} studentName={student.full_name} defaultTab="applications">
                                   <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs cursor-pointer hover:bg-purple-100 transition-colors">
                                     {student.college_list_count} colleges in application list
+                                  </Badge>
+                                </StudentDetailModal>
+                                <StudentDetailModal studentId={student.id} studentName={student.full_name} defaultTab="playbook">
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs cursor-pointer transition-colors ${
+                                      student.playbook_complete
+                                        ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                                    }`}
+                                  >
+                                    {student.playbook_complete ? "Playbook complete" : "Playbook not started"}
                                   </Badge>
                                 </StudentDetailModal>
                                 {student.application_progress.applied > 0 && (
