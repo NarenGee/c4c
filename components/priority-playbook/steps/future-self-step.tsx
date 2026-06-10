@@ -5,16 +5,19 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { FacilitatorPanel } from "../facilitator-panel"
+import { FocusAreasReference } from "../focus-areas-reference"
+import { NO_AUTOCORRECT_PROPS } from "../no-autocorrect"
 import { DynamicStringList } from "../dynamic-string-list"
 import type { FutureSelf } from "@/lib/priority-playbook/types"
 import { Clock, Play, Pause, RotateCcw } from "lucide-react"
 
 interface FutureSelfStepProps {
   futureSelf: FutureSelf
+  focusAreas: string[]
   onChange: (futureSelf: FutureSelf) => void
 }
 
-export function FutureSelfStep({ futureSelf, onChange }: FutureSelfStepProps) {
+export function FutureSelfStep({ futureSelf, focusAreas, onChange }: FutureSelfStepProps) {
   const [secondsLeft, setSecondsLeft] = useState(180)
   const [timerRunning, setTimerRunning] = useState(false)
 
@@ -31,13 +34,13 @@ export function FutureSelfStep({ futureSelf, onChange }: FutureSelfStepProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       <FacilitatorPanel
-        title="Future Self Visualization"
-        description="Imagine your ideal future self 2–3 years from now. What have you accomplished? Who have you become?"
-        prompt="You will have 3 minutes to write down: (1) all the things your ideal future self accomplished, and (2) what words describe future you."
+        title="Write Your Future Self"
+        description="You will have 3 minutes to write down: (1) all the things your ideal future self accomplished, and (2) what words describe future you."
         showTimer
         timerSeconds={180}
+        afterTitle={<FocusAreasReference focusAreas={focusAreas} variant="inline" />}
       />
       <div className="space-y-5">
         <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
@@ -69,6 +72,7 @@ export function FutureSelfStep({ futureSelf, onChange }: FutureSelfStepProps) {
             onChange={(e) => onChange({ ...futureSelf, narrative: e.target.value })}
             placeholder="Describe what your ideal future looks like..."
             rows={4}
+            {...NO_AUTOCORRECT_PROPS}
           />
         </div>
 

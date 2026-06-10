@@ -2,93 +2,140 @@
 
 import { useMemo, useState } from "react"
 import { FacilitatorPanel } from "../facilitator-panel"
-import { DropZone, DraggableItem } from "../item-pool"
-import type { PlaybookItem, RockSort } from "@/lib/priority-playbook/types"
+import { AssignmentHint } from "../assignment-hint"
+import { DropZone } from "../item-pool"
+import { UnassignedPool } from "../unassigned-pool"
+import { useDragAutoScroll } from "../use-drag-auto-scroll"
+import { enrichPlaybookItem, enrichPlaybookItems } from "@/lib/priority-playbook/item-context"
+import type { PlaybookGoal, PlaybookItem, RockSort } from "@/lib/priority-playbook/types"
 import { collectRockSortItems } from "@/lib/priority-playbook/types"
 
 interface RocksSortStepProps {
   inventory: PlaybookItem[]
   rockSort: RockSort
+  goals: PlaybookGoal[]
   onChange: (rockSort: RockSort) => void
 }
 
 type Bucket = keyof RockSort
 
-export function RocksSortStep({ inventory, rockSort, onChange }: RocksSortStepProps) {
-  const [draggedItem, setDraggedItem] = useState<PlaybookItem | null>(null)
+function enrichRockSort(rockSort: RockSort, goals: PlaybookGoal[]): RockSort {
+  return {
+    big_rocks: enrichPlaybookItems(rockSort.big_rocks, goals),
+    gravel: enrichPlaybookItems(rockSort.gravel, goals),
+    sand: enrichPlaybookItems(rockSort.sand, goals),
+  }
+}
+
+export function RocksSortStep({ inventory, rockSort, goals, onChange }: RocksSortStepProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  useDragAutoScroll(isDragging)
+
+  const enrichedInventory = useMemo(
+    () => enrichPlaybookItems(inventory, goals),
+    [inventory, goals]
+  )
+
+  const enrichedRockSort = useMemo(
+    () => enrichRockSort(rockSort, goals),
+    [rockSort, goals]
+  )
 
   const unassigned = useMemo(() => {
-    const assignedIds = new Set(collectRockSortItems(rockSort).map((item) => item.id))
-    return inventory.filter((item) => !assignedIds.has(item.id))
-  }, [inventory, rockSort])
+    const assignedIds = new Set(collectRockSortItems(enrichedRockSort).map((item) => item.id))
+    return enrichedInventory.filter((item) => !assignedIds.has(item.id))
+  }, [enrichedInventory, enrichedRockSort])
+
+  const selectedItem = useMemo(() => {
+    if (!selectedId) return null
+    return (
+      unassigned.find((item) => item.id === selectedId) ||
+      collectRockSortItems(enrichedRockSort).find((item) => item.id === selectedId) ||
+      null
+    )
+  }, [selectedId, unassigned, enrichedRockSort])
 
   const removeFromAllBuckets = (itemId: string): RockSort => ({
-    big_rocks: rockSort.big_rocks.filter((i) => i.id !== itemId),
-    gravel: rockSort.gravel.filter((i) => i.id !== itemId),
-    sand: rockSort.sand.filter((i) => i.id !== itemId),
+    big_rocks: enrichedRockSort.big_rocks.filter((item) => item.id !== itemId),
+    gravel: enrichedRockSort.gravel.filter((item) => item.id !== itemId),
+    sand: enrichedRockSort.sand.filter((item) => item.id !== itemId),
   })
 
   const dropInto = (bucket: Bucket, item: PlaybookItem) => {
-    const cleaned = removeFromAllBuckets(item.id)
+    const enrichedItem = enrichPlaybookItem(item, goals)
+    const cleaned = removeFromAllBuckets(enrichedItem.id)
     onChange({
       ...cleaned,
-      [bucket]: [...cleaned[bucket], item],
+      [bucket]: [...cleaned[bucket], enrichedItem],
     })
+    setSelectedId(null)
+  }
+
+  const handleSelect = (item: PlaybookItem) => {
+    setSelectedId((current) => (current === item.id ? null : item.id))
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <FacilitatorPanel
-          title="Big Rocks, Gravel & Sand"
-          description="Prioritize your goals using Stephen Covey's metaphor: put the big rocks in first."
-          quote={`"If the big rocks don't go in first, they aren't going to fit in later." — Stephen Covey`}
-        />
-        <div className="lg:col-span-2 space-y-4">
-          <p className="text-sm text-slate-600">
-            Drag each item into the right category. <strong>Big Rocks</strong> first, then{" "}
-            <strong>Gravel</strong>, then <strong>Sand</strong>.
-          </p>
-          {unassigned.length > 0 && (
-            <div className="rounded-xl border bg-slate-50 p-3">
-              <h4 className="text-sm font-medium text-slate-700 mb-2">Unassigned ({unassigned.length})</h4>
-              <div className="flex flex-wrap gap-2">
-                {unassigned.map((item) => (
-                  <DraggableItem key={item.id} item={item} onDragStart={setDraggedItem} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="space-y-4">
+      <FacilitatorPanel
+        title="Big Rocks, Gravel & Sand"
+        description="Prioritize your goals using Stephen Covey's metaphor: put the big rocks in first."
+        quote={`"If the big rocks don't go in first, they aren't going to fit in later." — Stephen Covey`}
+      />
+
+      <AssignmentHint />
+
+      <UnassignedPool
+        items={unassigned}
+        selectedId={selectedId}
+        onSelect={handleSelect}
+        onDragStart={() => setIsDragging(true)}
+        onDragEnd={() => setIsDragging(false)}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <DropZone
           title="Big Rocks"
           description="High priority projects and tasks"
-          items={rockSort.big_rocks}
+          items={enrichedRockSort.big_rocks}
           onDrop={(item) => dropInto("big_rocks", item)}
-          onDragStart={setDraggedItem}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={() => setIsDragging(false)}
+          selectedItem={selectedItem}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          isDragActive={isDragging}
           className="border-red-200 bg-red-50/50"
         />
         <DropZone
           title="Gravel"
           description="Urgent or important tasks"
-          items={rockSort.gravel}
+          items={enrichedRockSort.gravel}
           onDrop={(item) => dropInto("gravel", item)}
-          onDragStart={setDraggedItem}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={() => setIsDragging(false)}
+          selectedItem={selectedItem}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          isDragActive={isDragging}
           className="border-amber-200 bg-amber-50/50"
         />
         <DropZone
           title="Sand"
           description="Unimportant projects and tasks"
-          items={rockSort.sand}
+          items={enrichedRockSort.sand}
           onDrop={(item) => dropInto("sand", item)}
-          onDragStart={setDraggedItem}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={() => setIsDragging(false)}
+          selectedItem={selectedItem}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          isDragActive={isDragging}
           className="border-slate-200 bg-slate-50/50"
         />
       </div>
-      {draggedItem && null}
     </div>
   )
 }

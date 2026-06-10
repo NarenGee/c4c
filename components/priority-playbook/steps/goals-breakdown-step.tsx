@@ -2,6 +2,7 @@
 
 import { FacilitatorPanel } from "../facilitator-panel"
 import { DynamicStringList } from "../dynamic-string-list"
+import { MilestoneList } from "../milestone-list"
 import type { PlaybookGoal } from "@/lib/priority-playbook/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -39,7 +40,7 @@ export function GoalsBreakdownStep({ goals, onChange }: GoalsBreakdownStepProps)
               <CardTitle className="text-base text-blue-800">{goal.title}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <DynamicStringList
+              <MilestoneList
                 label="Key milestones"
                 placeholder="A milestone on the way to this goal..."
                 values={goal.milestones}
@@ -49,7 +50,13 @@ export function GoalsBreakdownStep({ goals, onChange }: GoalsBreakdownStepProps)
                 label="Tasks to reach the first milestone"
                 placeholder="A task to complete..."
                 values={goal.firstMilestoneTasks}
-                onChange={(firstMilestoneTasks) => updateGoal(index, { firstMilestoneTasks })}
+                onChange={(firstMilestoneTasks) => {
+                  const milestones = [...goal.milestones]
+                  if (milestones[0]) {
+                    milestones[0] = { ...milestones[0], tasks: firstMilestoneTasks }
+                  }
+                  updateGoal(index, { firstMilestoneTasks, milestones })
+                }}
               />
             </CardContent>
           </Card>

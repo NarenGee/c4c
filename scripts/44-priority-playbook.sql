@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS priority_playbook_sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed')),
-  current_step INT NOT NULL DEFAULT 1 CHECK (current_step >= 1 AND current_step <= 9),
+  current_step INT NOT NULL DEFAULT 1 CHECK (current_step >= 1 AND current_step <= 10),
   session_number INT NOT NULL DEFAULT 1,
   reflection JSONB DEFAULT '{}'::jsonb,
   focus_areas JSONB DEFAULT '[]'::jsonb,

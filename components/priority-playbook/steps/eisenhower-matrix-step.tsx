@@ -2,12 +2,17 @@
 
 import { useMemo, useState } from "react"
 import { FacilitatorPanel } from "../facilitator-panel"
+import { AssignmentHint } from "../assignment-hint"
 import { DraggableItem, parseDroppedItem } from "../item-pool"
-import type { MatrixItem, QuadrantPriority } from "@/lib/priority-playbook/types"
+import { UnassignedPool } from "../unassigned-pool"
+import { useDragAutoScroll } from "../use-drag-auto-scroll"
+import { enrichMatrixItem, enrichMatrixItems } from "@/lib/priority-playbook/item-context"
+import type { MatrixItem, PlaybookGoal, QuadrantPriority } from "@/lib/priority-playbook/types"
 import { cn } from "@/lib/utils"
 
 interface EisenhowerMatrixStepProps {
   matrix: MatrixItem[]
+  goals: PlaybookGoal[]
   onChange: (matrix: MatrixItem[]) => void
 }
 
@@ -48,87 +53,144 @@ const QUADRANTS: {
   },
 ]
 
-export function EisenhowerMatrixStep({ matrix, onChange }: EisenhowerMatrixStepProps) {
+export function EisenhowerMatrixStep({ matrix, goals, onChange }: EisenhowerMatrixStepProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
-  const unassigned = useMemo(
-    () => matrix.filter((item) => !item.quadrant),
-    [matrix]
+  useDragAutoScroll(isDragging)
+
+  const enrichedMatrix = useMemo(
+    () => enrichMatrixItems(matrix, goals),
+    [matrix, goals]
   )
 
+  const unassigned = useMemo(
+    () => enrichedMatrix.filter((item) => !item.quadrant),
+    [enrichedMatrix]
+  )
+
+  const selectedItem = useMemo(() => {
+    if (!selectedId) return null
+    return enrichedMatrix.find((item) => item.id === selectedId) || null
+  }, [selectedId, enrichedMatrix])
+
   const assignQuadrant = (itemId: string, quadrant: QuadrantPriority) => {
+    const item = enrichedMatrix.find((entry) => entry.id === itemId)
+    if (!item) return
+
+    const enrichedItem = enrichMatrixItem(item, goals)
     onChange(
-      matrix.map((item) => (item.id === itemId ? { ...item, quadrant } : item))
+      matrix.map((entry) =>
+        entry.id === itemId
+          ? { ...entry, ...enrichedItem, quadrant }
+          : entry
+      )
     )
+    setSelectedId(null)
+    setDraggedId(null)
+  }
+
+  const handleSelect = (item: MatrixItem) => {
+    setSelectedId((current) => (current === item.id ? null : item.id))
   }
 
   const itemsInQuadrant = (quadrant: QuadrantPriority) =>
-    matrix.filter((item) => item.quadrant === quadrant)
+    enrichedMatrix.filter((item) => item.quadrant === quadrant)
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <FacilitatorPanel
-          title="The Urgent–Important Matrix"
-          description="Sort your tasks into four quadrants based on urgency and importance."
-          quote={`"What is important is seldom urgent and what is urgent is seldom important." — Dwight D. Eisenhower`}
-        />
-        <div className="lg:col-span-2">
-          {unassigned.length > 0 && (
-            <div className="rounded-xl border bg-white p-3 mb-4">
-              <h4 className="text-sm font-medium mb-2">Unassigned ({unassigned.length})</h4>
-              <div className="flex flex-wrap gap-2">
-                {unassigned.map((item) => (
+    <div className="space-y-4">
+      <FacilitatorPanel
+        title="The Urgent–Important Matrix"
+        description="Sort your tasks into four quadrants based on urgency and importance."
+        quote={`"What is important is seldom urgent and what is urgent is seldom important." — Dwight D. Eisenhower`}
+      />
+
+      <AssignmentHint />
+
+      <UnassignedPool
+        items={unassigned}
+        selectedId={selectedId}
+        onSelect={handleSelect}
+        onDragStart={() => setIsDragging(true)}
+        onDragEnd={() => {
+          setIsDragging(false)
+          setDraggedId(null)
+        }}
+      />
+
+      <div className="hidden md:grid grid-cols-2 text-center text-xs text-slate-500 font-medium px-1">
+        <span>URGENT</span>
+        <span>NON-URGENT</span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {QUADRANTS.map((quadrant) => {
+          const canAcceptSelection = !!selectedItem
+
+          return (
+            <div
+              key={quadrant.key}
+              className={cn(
+                "rounded-xl border-2 p-3 min-h-[180px] transition-colors",
+                quadrant.className,
+                canAcceptSelection && "cursor-pointer hover:border-blue-400",
+                isDragging && "ring-1 ring-blue-200"
+              )}
+              onDragOver={(event) => {
+                event.preventDefault()
+                event.dataTransfer.dropEffect = "move"
+              }}
+              onDrop={(event) => {
+                event.preventDefault()
+                const dropped = parseDroppedItem(event.dataTransfer)
+                const itemId = dropped?.id || draggedId
+                if (itemId) assignQuadrant(itemId, quadrant.key)
+                setIsDragging(false)
+                setDraggedId(null)
+              }}
+              onClick={() => {
+                if (selectedItem) assignQuadrant(selectedItem.id, quadrant.key)
+              }}
+              onKeyDown={(event) => {
+                if (!selectedItem) return
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  assignQuadrant(selectedItem.id, quadrant.key)
+                }
+              }}
+              role={canAcceptSelection ? "button" : undefined}
+              tabIndex={canAcceptSelection ? 0 : undefined}
+            >
+              <div className="mb-2">
+                <h4 className="font-semibold text-sm">{quadrant.title}</h4>
+                <p className="text-xs font-medium text-slate-700">{quadrant.subtitle}</p>
+                <p className="text-xs text-slate-500 mt-1">{quadrant.description}</p>
+                {canAcceptSelection && (
+                  <p className="text-xs text-blue-600 mt-1">Tap to place selected task here</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                {itemsInQuadrant(quadrant.key).map((item) => (
                   <DraggableItem
                     key={item.id}
-                    item={{ id: item.id, text: item.text }}
-                    onDragStart={() => setDraggedId(item.id)}
+                    item={item}
+                    selected={selectedId === item.id}
+                    onSelect={handleSelect}
+                    onDragStart={(entry) => {
+                      setDraggedId(entry.id)
+                      setIsDragging(true)
+                    }}
+                    onDragEnd={() => {
+                      setIsDragging(false)
+                      setDraggedId(null)
+                    }}
                   />
                 ))}
               </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {QUADRANTS.map((q) => (
-          <div
-            key={q.key}
-            className={cn("rounded-xl border-2 p-3 min-h-[160px]", q.className)}
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.dataTransfer.dropEffect = "move"
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              const dropped = parseDroppedItem(e.dataTransfer)
-              const itemId = dropped?.id || draggedId
-              if (itemId) assignQuadrant(itemId, q.key)
-              setDraggedId(null)
-            }}
-          >
-            <div className="mb-2">
-              <h4 className="font-semibold text-sm">{q.title}</h4>
-              <p className="text-xs font-medium text-slate-700">{q.subtitle}</p>
-              <p className="text-xs text-slate-500 mt-1">{q.description}</p>
-            </div>
-            <div className="space-y-2">
-              {itemsInQuadrant(q.key).map((item) => (
-                <DraggableItem
-                  key={item.id}
-                  item={{ id: item.id, text: item.text }}
-                  onDragStart={() => setDraggedId(item.id)}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="hidden md:grid grid-cols-2 text-center text-xs text-slate-500 font-medium">
-        <span>URGENT</span>
-        <span>NON-URGENT</span>
+          )
+        })}
       </div>
     </div>
   )

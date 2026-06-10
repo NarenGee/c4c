@@ -3,6 +3,7 @@
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { FacilitatorPanel } from "../facilitator-panel"
+import { NO_AUTOCORRECT_PROPS } from "../no-autocorrect"
 import type { MatrixReflection } from "@/lib/priority-playbook/types"
 
 interface MatrixReflectionStepProps {
@@ -34,6 +35,7 @@ export function MatrixReflectionStep({ matrixReflection, onChange }: MatrixRefle
               onChange={(e) => onChange({ ...matrixReflection, [key]: e.target.value })}
               placeholder={placeholder}
               rows={3}
+              {...NO_AUTOCORRECT_PROPS}
             />
           </div>
         ))}

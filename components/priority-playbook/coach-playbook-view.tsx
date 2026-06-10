@@ -3,8 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import type { PriorityPlaybookSession } from "@/lib/priority-playbook/types"
-import { collectRockSortItems } from "@/lib/priority-playbook/types"
+import { PlaybookGanttChart } from "./playbook-gantt-chart"
+import { PlaybookItemSummaryList } from "./playbook-item-summary-list"
+import { enrichMatrixItem, getItemContextLabel } from "@/lib/priority-playbook/item-context"
+import type { MatrixItem, PlaybookItem, PriorityPlaybookSession } from "@/lib/priority-playbook/types"
+import { formatMilestoneLabel, normalizeMilestones } from "@/lib/priority-playbook/types"
 
 interface CoachPlaybookViewProps {
   session: PriorityPlaybookSession
@@ -65,12 +68,18 @@ export function CoachPlaybookView({ session, studentName }: CoachPlaybookViewPro
         </p>
       </Section>
 
+      <PlaybookGanttChart goals={session.goals} readOnly />
+
       <Section title="Goals & Milestones">
         {session.goals.map((goal) => (
           <div key={goal.id} className="mb-3 last:mb-0">
             <p className="font-medium text-sm text-blue-800">{goal.title}</p>
             <p className="text-xs text-slate-500 mt-1">
-              Milestones: {goal.milestones.filter(Boolean).join(", ")}
+              Milestones:{" "}
+              {normalizeMilestones(goal.milestones)
+                .map(formatMilestoneLabel)
+                .filter(Boolean)
+                .join(", ")}
             </p>
             <p className="text-xs text-slate-500">
               First milestone tasks: {goal.firstMilestoneTasks.filter(Boolean).join(", ")}
@@ -80,19 +89,14 @@ export function CoachPlaybookView({ session, studentName }: CoachPlaybookViewPro
       </Section>
 
       <Section title="Big Rocks / Gravel / Sand">
-        <BucketRow label="Big Rocks" items={session.rock_sort.big_rocks} />
-        <BucketRow label="Gravel" items={session.rock_sort.gravel} />
-        <BucketRow label="Sand" items={session.rock_sort.sand} />
+        <BucketSection label="Big Rocks" items={session.rock_sort.big_rocks} goals={session.goals} />
+        <BucketSection label="Gravel" items={session.rock_sort.gravel} goals={session.goals} />
+        <BucketSection label="Sand" items={session.rock_sort.sand} goals={session.goals} />
       </Section>
 
       <Section title="Eisenhower Matrix">
         {session.matrix.filter((m) => m.quadrant).map((item) => (
-          <div key={item.id} className="flex gap-2 text-sm mb-1">
-            <Badge variant="outline" className="text-xs shrink-0">
-              {QUADRANT_LABELS[item.quadrant!]?.split("—")[0]?.trim()}
-            </Badge>
-            <span className="text-slate-600">{item.text}</span>
-          </div>
+          <MatrixItemRow key={item.id} item={item} goals={session.goals} />
         ))}
         {session.matrix.filter((m) => m.quadrant).length === 0 && (
           <p className="text-sm text-slate-400">No matrix items recorded.</p>
@@ -136,12 +140,42 @@ function ReflectionRow({
   )
 }
 
-function BucketRow({ label, items }: { label: string; items: { text: string }[] }) {
+function BucketSection({
+  label,
+  items,
+  goals,
+}: {
+  label: string
+  items: PlaybookItem[]
+  goals: PriorityPlaybookSession["goals"]
+}) {
   return (
-    <p className="text-sm mb-1">
-      <span className="font-medium">{label}: </span>
-      <span className="text-slate-600">{items.map((i) => i.text).join(", ") || "—"}</span>
-    </p>
+    <div className="mb-3 last:mb-0">
+      <p className="text-sm font-medium mb-2">{label}</p>
+      <PlaybookItemSummaryList items={items} goals={goals} emptyLabel="—" />
+    </div>
+  )
+}
+
+function MatrixItemRow({
+  item,
+  goals,
+}: {
+  item: MatrixItem
+  goals: PriorityPlaybookSession["goals"]
+}) {
+  const enriched = enrichMatrixItem(item, goals)
+
+  return (
+    <div className="flex gap-2 text-sm mb-2">
+      <Badge variant="outline" className="text-xs shrink-0">
+        {QUADRANT_LABELS[item.quadrant!]?.split("—")[0]?.trim()}
+      </Badge>
+      <div>
+        <p className="text-slate-800 font-medium">{enriched.text}</p>
+        <p className="text-xs text-slate-500">{getItemContextLabel(enriched)}</p>
+      </div>
+    </div>
   )
 }
 

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Trash2 } from "lucide-react"
 import { FacilitatorPanel } from "../facilitator-panel"
+import { NO_AUTOCORRECT_PROPS } from "../no-autocorrect"
 import type { PlaybookItem } from "@/lib/priority-playbook/types"
 
 interface InventoryStepProps {
@@ -36,13 +37,14 @@ export function InventoryStep({ otherTasks, onChange }: InventoryStepProps) {
         prompt="Write down all the other stuff you need to do or that you spend time on every day. EVERYTHING!"
       />
       <div className="rounded-xl border bg-white p-4 space-y-3">
-        <label className="text-sm font-medium text-slate-700">Daily tasks & time sinks</label>
+        <label className="text-sm font-medium text-slate-700">Daily tasks & commitments</label>
         {items.map((item, index) => (
           <div key={item.id} className="flex gap-2">
             <Input
               value={item.text}
               onChange={(e) => updateItem(index, e.target.value)}
               placeholder="e.g. Social media, chores, club meetings..."
+              {...NO_AUTOCORRECT_PROPS}
             />
             <Button
               type="button"

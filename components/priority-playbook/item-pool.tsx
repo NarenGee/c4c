@@ -2,31 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import type { PlaybookItem } from "@/lib/priority-playbook/types"
-
-interface DraggableItemProps {
-  item: PlaybookItem
-  onDragStart: (item: PlaybookItem) => void
-  className?: string
-}
-
-export function DraggableItem({ item, onDragStart, className }: DraggableItemProps) {
-  return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("application/playbook-item", JSON.stringify(item))
-        e.dataTransfer.effectAllowed = "move"
-        onDragStart(item)
-      }}
-      className={cn(
-        "rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-300 transition-colors",
-        className
-      )}
-    >
-      {item.text}
-    </div>
-  )
-}
+import { PlaybookItemCard } from "./playbook-item-card"
 
 export function parseDroppedItem(dataTransfer: DataTransfer): PlaybookItem | null {
   const raw = dataTransfer.getData("application/playbook-item")
@@ -38,14 +14,48 @@ export function parseDroppedItem(dataTransfer: DataTransfer): PlaybookItem | nul
   }
 }
 
+interface DraggableItemProps {
+  item: PlaybookItem
+  onDragStart: (item: PlaybookItem) => void
+  onDragEnd?: () => void
+  selected?: boolean
+  onSelect?: (item: PlaybookItem) => void
+  className?: string
+}
+
+export function DraggableItem({
+  item,
+  onDragStart,
+  onDragEnd,
+  selected,
+  onSelect,
+  className,
+}: DraggableItemProps) {
+  return (
+    <PlaybookItemCard
+      item={item}
+      selected={selected}
+      onSelect={onSelect}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={className}
+    />
+  )
+}
+
 interface DropZoneProps {
   title: string
   description?: string
   items: PlaybookItem[]
   onDrop: (item: PlaybookItem) => void
   onDragStart: (item: PlaybookItem) => void
+  onDragEnd?: () => void
+  selectedItem?: PlaybookItem | null
+  onSelect?: (item: PlaybookItem) => void
+  selectedId?: string | null
   className?: string
   emptyLabel?: string
+  isDragActive?: boolean
 }
 
 export function DropZone({
@@ -54,32 +64,66 @@ export function DropZone({
   items,
   onDrop,
   onDragStart,
+  onDragEnd,
+  selectedItem,
+  onSelect,
+  selectedId,
   className,
   emptyLabel = "Drop items here",
+  isDragActive = false,
 }: DropZoneProps) {
+  const canAcceptSelection = !!selectedItem
+
   return (
     <div
-      className={cn("rounded-xl border-2 border-dashed p-3 min-h-[120px] transition-colors", className)}
-      onDragOver={(e) => {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = "move"
+      className={cn(
+        "rounded-xl border-2 border-dashed p-3 min-h-[140px] transition-colors",
+        canAcceptSelection && "cursor-pointer hover:border-blue-400 hover:bg-blue-50/40",
+        isDragActive && "border-blue-400 bg-blue-50/30",
+        className
+      )}
+      onDragOver={(event) => {
+        event.preventDefault()
+        event.dataTransfer.dropEffect = "move"
       }}
-      onDrop={(e) => {
-        e.preventDefault()
-        const item = parseDroppedItem(e.dataTransfer)
+      onDrop={(event) => {
+        event.preventDefault()
+        const item = parseDroppedItem(event.dataTransfer)
         if (item) onDrop(item)
       }}
+      onClick={() => {
+        if (selectedItem) onDrop(selectedItem)
+      }}
+      onKeyDown={(event) => {
+        if (!selectedItem) return
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onDrop(selectedItem)
+        }
+      }}
+      role={canAcceptSelection ? "button" : undefined}
+      tabIndex={canAcceptSelection ? 0 : undefined}
     >
       <div className="mb-2">
         <h4 className="font-semibold text-sm text-slate-800">{title}</h4>
         {description && <p className="text-xs text-slate-500">{description}</p>}
+        {canAcceptSelection && (
+          <p className="text-xs text-blue-600 mt-1">Tap to place selected task here</p>
+        )}
       </div>
       <div className="space-y-2">
         {items.length === 0 ? (
           <p className="text-xs text-slate-400 italic">{emptyLabel}</p>
         ) : (
           items.map((item) => (
-            <DraggableItem key={item.id} item={item} onDragStart={onDragStart} />
+            <DraggableItem
+              key={item.id}
+              item={item}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              selected={selectedId === item.id}
+              onSelect={onSelect}
+            />
           ))
         )}
       </div>

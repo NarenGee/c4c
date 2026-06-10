@@ -5,15 +5,27 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, ArrowRight, ChevronLeft } from "lucide-react"
-import type { PriorityPlaybookSession } from "@/lib/priority-playbook/types"
+import { CheckCircle, ArrowRight, ChevronLeft, Pencil } from "lucide-react"
+import {
+  formatMilestoneLabel,
+  normalizeMilestones,
+  type PlaybookGoal,
+  type PriorityPlaybookSession,
+} from "@/lib/priority-playbook/types"
 import { EisenhowerMatrixDiagram } from "../eisenhower-matrix-diagram"
+import { PlaybookGanttChart } from "../playbook-gantt-chart"
+import { PlaybookItemSummaryList } from "../playbook-item-summary-list"
 
 interface SummaryStepProps {
   session: PriorityPlaybookSession
   onComplete: () => void
+  onSaveEdits?: () => void
+  onEditPlaybook?: () => void
+  onCancelEdit?: () => void
+  onGoalsChange?: (goals: PlaybookGoal[]) => void
   completing: boolean
   completed: boolean
+  isEditing?: boolean
   actionsCreated?: number
 }
 
@@ -83,7 +95,11 @@ function PlaybookSummaryContent({ session }: { session: PriorityPlaybookSession 
             <div key={goal.id}>
               <p className="font-medium text-blue-800">{goal.title}</p>
               <p className="text-xs text-slate-500 mt-1">
-                Milestones: {goal.milestones.filter(Boolean).join(", ") || "—"}
+                Milestones:{" "}
+                {normalizeMilestones(goal.milestones)
+                  .map(formatMilestoneLabel)
+                  .filter(Boolean)
+                  .join(", ") || "—"}
               </p>
               <p className="text-xs text-slate-500">
                 First milestone tasks: {goal.firstMilestoneTasks.filter(Boolean).join(", ") || "—"}
@@ -97,8 +113,35 @@ function PlaybookSummaryContent({ session }: { session: PriorityPlaybookSession 
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Big Rocks ({session.rock_sort.big_rocks.length})</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-slate-600">
-          {session.rock_sort.big_rocks.map((i) => i.text).join(", ") || "—"}
+        <CardContent>
+          <PlaybookItemSummaryList
+            items={session.rock_sort.big_rocks}
+            goals={session.goals}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Gravel ({session.rock_sort.gravel.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PlaybookItemSummaryList
+            items={session.rock_sort.gravel}
+            goals={session.goals}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Sand ({session.rock_sort.sand.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PlaybookItemSummaryList
+            items={session.rock_sort.sand}
+            goals={session.goals}
+          />
         </CardContent>
       </Card>
 
@@ -107,7 +150,7 @@ function PlaybookSummaryContent({ session }: { session: PriorityPlaybookSession 
           <CardTitle className="text-sm">Eisenhower Matrix</CardTitle>
         </CardHeader>
         <CardContent>
-          <EisenhowerMatrixDiagram matrix={session.matrix} />
+          <EisenhowerMatrixDiagram matrix={session.matrix} goals={session.goals} />
         </CardContent>
       </Card>
 
@@ -129,28 +172,73 @@ function PlaybookSummaryContent({ session }: { session: PriorityPlaybookSession 
 export function SummaryStep({
   session,
   onComplete,
+  onSaveEdits,
+  onEditPlaybook,
+  onCancelEdit,
+  onGoalsChange,
   completing,
   completed,
+  isEditing = false,
   actionsCreated = 0,
 }: SummaryStepProps) {
   const [showFullSummary, setShowFullSummary] = useState(false)
 
+  if (isEditing) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-slate-800">Review Your Changes</h2>
+          <p className="text-slate-600 text-sm mt-1 max-w-xl mx-auto">
+            Save to update your playbook and sync any new tasks to your dashboard.
+            Tasks removed here stay on your dashboard until you delete them there.
+          </p>
+        </div>
+
+        <PlaybookSummaryContent session={session} />
+
+        <div className="flex flex-wrap justify-center gap-3 pt-4">
+          <Button variant="outline" onClick={onCancelEdit} disabled={completing}>
+            Cancel
+          </Button>
+          <Button size="lg" onClick={onSaveEdits} disabled={completing} className="gap-2">
+            {completing ? "Saving..." : "Save Changes & Sync to Dashboard"}
+            <CheckCircle className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (completed && !showFullSummary) {
     return (
-      <div className="text-center space-y-6 py-8">
-        <CheckCircle className="h-16 w-16 text-green-600 mx-auto" />
-        <h2 className="text-2xl font-bold text-slate-800">Priority Playbook Complete!</h2>
-        <p className="text-slate-600 max-w-lg mx-auto">
-          {actionsCreated > 0
-            ? `${actionsCreated} prioritized action${actionsCreated === 1 ? "" : "s"} have been added to your dashboard.`
-            : "Your playbook has been saved."}
-        </p>
+      <div className="space-y-6 py-4">
+        <div className="text-center space-y-3">
+          <CheckCircle className="h-14 w-14 text-green-600 mx-auto" />
+          <h2 className="text-2xl font-bold text-slate-800">Priority Playbook Complete!</h2>
+          <p className="text-slate-600 max-w-lg mx-auto">
+            {actionsCreated > 0
+              ? `${actionsCreated} prioritized action${actionsCreated === 1 ? "" : "s"} have been added to your dashboard.`
+              : "Your playbook has been saved."}
+          </p>
+        </div>
+
+        <PlaybookGanttChart
+          goals={session.goals}
+          onChange={onGoalsChange}
+        />
+
         <div className="flex flex-wrap justify-center gap-3">
           <Link href="/dashboard">
             <Button className="gap-2">
               Go to Dashboard <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
+          {onEditPlaybook && (
+            <Button variant="outline" onClick={onEditPlaybook} className="gap-2">
+              <Pencil className="h-4 w-4" />
+              Edit Playbook
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setShowFullSummary(true)}>
             View Summary
           </Button>
@@ -165,13 +253,27 @@ export function SummaryStep({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-800">Your Priority Playbook Summary</h2>
-            <p className="text-slate-600 text-sm mt-1">Read-only review of your completed workshop.</p>
+            <p className="text-slate-600 text-sm mt-1">
+              Review your completed playbook or edit it to update tasks and priorities.
+            </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setShowFullSummary(false)} className="gap-1 self-start">
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </Button>
+          <div className="flex flex-wrap gap-2 self-start">
+            {onEditPlaybook && (
+              <Button variant="outline" size="sm" onClick={onEditPlaybook} className="gap-1">
+                <Pencil className="h-3.5 w-3.5" />
+                Edit Playbook
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setShowFullSummary(false)} className="gap-1">
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </Button>
+          </div>
         </div>
+        <PlaybookGanttChart
+          goals={session.goals}
+          onChange={onGoalsChange}
+        />
         <PlaybookSummaryContent session={session} />
         <div className="flex justify-center pt-2">
           <Link href="/dashboard">

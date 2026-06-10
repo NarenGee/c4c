@@ -3,6 +3,7 @@
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { FacilitatorPanel } from "../facilitator-panel"
+import { NO_AUTOCORRECT_PROPS } from "../no-autocorrect"
 import type { PlaybookReflection, ReflectionRating } from "@/lib/priority-playbook/types"
 
 interface ReflectionStepProps {
@@ -30,7 +31,6 @@ const QUESTIONS: {
 
 const RATINGS: { value: ReflectionRating; label: string }[] = [
   { value: "yes", label: "Yes" },
-  { value: "somewhat", label: "Somewhat" },
   { value: "no", label: "No" },
 ]
 
@@ -49,7 +49,7 @@ export function ReflectionStep({ reflection, onChange }: ReflectionStepProps) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <FacilitatorPanel
         title="Opening Reflection"
-        description="Take a moment to honestly assess where you are today relative to your future goals."
+        description="To what extent have you really thought about your future?"
         prompt="Your facilitator will guide you through three reflection questions. Answer honestly — there are no wrong answers."
       />
       <div className="space-y-6">
@@ -77,6 +77,7 @@ export function ReflectionStep({ reflection, onChange }: ReflectionStepProps) {
               onChange={(e) => updateAnswer(key, "notes", e.target.value)}
               placeholder="Optional notes..."
               rows={2}
+              {...NO_AUTOCORRECT_PROPS}
             />
           </div>
         ))}

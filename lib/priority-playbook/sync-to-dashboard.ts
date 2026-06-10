@@ -84,6 +84,9 @@ export function initializeMatrixFromRocks(rockSort: RockSort, existing: MatrixIt
       id: item.id,
       text: item.text,
       quadrant: existingItem?.quadrant ?? null,
+      source: item.source ?? existingItem?.source,
+      goalTitle: item.goalTitle ?? existingItem?.goalTitle,
+      milestoneTitle: item.milestoneTitle ?? existingItem?.milestoneTitle,
     }
   })
 }

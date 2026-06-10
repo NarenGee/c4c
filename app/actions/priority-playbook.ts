@@ -6,7 +6,9 @@ import {
   type PriorityPlaybookSession,
   normalizeSession,
   createEmptySession,
+  createMilestone,
   collectInventoryItems,
+  persistPlaybookSession,
 } from "@/lib/priority-playbook/types"
 import {
   buildDashboardActions,
@@ -166,23 +168,24 @@ export async function savePlaybookSession(
   }
 
   const supabase = await createClient()
+  const persisted = persistPlaybookSession(session)
 
   const { data, error } = await supabase
     .from("priority_playbook_sessions")
     .update({
-      current_step: session.current_step,
-      reflection: session.reflection,
-      focus_areas: session.focus_areas,
-      future_self: session.future_self,
-      goals: session.goals,
-      other_tasks: session.other_tasks,
-      rock_sort: session.rock_sort,
-      matrix: session.matrix,
-      matrix_reflection: session.matrix_reflection,
+      current_step: persisted.current_step,
+      reflection: persisted.reflection,
+      focus_areas: persisted.focus_areas,
+      future_self: persisted.future_self,
+      goals: persisted.goals,
+      other_tasks: persisted.other_tasks,
+      rock_sort: persisted.rock_sort,
+      matrix: persisted.matrix,
+      matrix_reflection: persisted.matrix_reflection,
     })
     .eq("id", session.id)
     .eq("student_id", user.id)
-    .eq("status", "in_progress")
+    .in("status", ["in_progress", "completed"])
     .select("*")
     .single()
 
@@ -194,34 +197,123 @@ export async function savePlaybookSession(
   return { success: true, session: normalizeSession(data) }
 }
 
+async function syncPlaybookActionsToDashboard(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  session: PriorityPlaybookSession,
+  studentId: string,
+  studentName: string
+): Promise<{ success: boolean; actionsCreated: number; error?: string }> {
+  const allActions = buildDashboardActions(session, studentName, studentId)
+
+  const { data: existingNotes } = await supabase
+    .from("student_notes")
+    .select("content")
+    .eq("student_id", studentId)
+    .eq("type", "action")
+    .like("content", "[Priority Playbook]%")
+
+  const actions = filterNewDashboardActions(
+    allActions,
+    (existingNotes ?? []).map((note) => note.content)
+  )
+
+  if (actions.length === 0) {
+    return { success: true, actionsCreated: 0 }
+  }
+
+  const { error: notesError } = await supabase.from("student_notes").insert(
+    actions.map((action) => ({
+      student_id: studentId,
+      content: action.content,
+      author: action.author,
+      author_id: action.author_id,
+      type: action.type,
+      action_status: action.action_status,
+      priority: action.priority,
+      visible_to_student: action.visible_to_student,
+    }))
+  )
+
+  if (notesError) {
+    console.error("Error syncing to dashboard:", notesError)
+    return { success: false, actionsCreated: 0, error: "Failed to sync actions to dashboard" }
+  }
+
+  return { success: true, actionsCreated: actions.length }
+}
+
+export async function updateCompletedPlaybook(
+  session: PriorityPlaybookSession
+): Promise<PlaybookResult & { actionsCreated?: number }> {
+  const user = await getCurrentUser()
+  if (!user || user.role !== "student") {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  if (session.student_id !== user.id || session.status !== "completed") {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const saveResult = await savePlaybookSession(session)
+  if (!saveResult.success || !saveResult.session) {
+    return saveResult
+  }
+
+  const supabase = await createClient()
+  const syncResult = await syncPlaybookActionsToDashboard(
+    supabase,
+    saveResult.session,
+    user.id,
+    user.full_name
+  )
+
+  if (!syncResult.success) {
+    return { success: false, error: syncResult.error }
+  }
+
+  if (syncResult.actionsCreated > 0) {
+    await supabase
+      .from("priority_playbook_sessions")
+      .update({ synced_to_dashboard_at: new Date().toISOString() })
+      .eq("id", session.id)
+      .eq("student_id", user.id)
+  }
+
+  return {
+    success: true,
+    session: saveResult.session,
+    actionsCreated: syncResult.actionsCreated,
+  }
+}
+
 export async function prepareStepData(
   session: PriorityPlaybookSession,
   step: number
 ): Promise<PlaybookResult> {
   let updated = { ...session }
 
-  if (step === 4 && updated.goals.length === 0) {
+  if (step === 5 && updated.goals.length === 0) {
     updated.goals = updated.future_self.accomplishments
       .map((title) => title.trim())
       .filter(Boolean)
       .map((title) => ({
         id: crypto.randomUUID(),
         title,
-        milestones: [""],
+        milestones: [createMilestone()],
         firstMilestoneTasks: [""],
       }))
   }
 
-  if (step === 6) {
+  if (step === 7) {
     const inventory = collectInventoryItems(updated)
     updated.rock_sort = initializeRockSortFromInventory(inventory, updated.rock_sort)
   }
 
-  if (step === 7) {
+  if (step === 8) {
     updated.matrix = initializeMatrixFromRocks(updated.rock_sort, updated.matrix)
   }
 
-  return savePlaybookSession(updated)
+  return { success: true, session: updated }
 }
 
 export async function completePlaybook(sessionId: string): Promise<PlaybookResult & { actionsCreated?: number }> {
@@ -245,48 +337,19 @@ export async function completePlaybook(sessionId: string): Promise<PlaybookResul
 
   const session = normalizeSession(sessionRow)
 
-  if (session.status === "completed" && session.synced_to_dashboard_at) {
+  if (session.status === "completed") {
     return { success: true, session, actionsCreated: 0 }
   }
 
-  let actionsCreated = 0
+  const syncResult = await syncPlaybookActionsToDashboard(
+    supabase,
+    session,
+    user.id,
+    user.full_name
+  )
 
-  if (!session.synced_to_dashboard_at) {
-    const allActions = buildDashboardActions(session, user.full_name, user.id)
-
-    const { data: existingNotes } = await supabase
-      .from("student_notes")
-      .select("content")
-      .eq("student_id", user.id)
-      .eq("type", "action")
-      .like("content", "[Priority Playbook]%")
-
-    const actions = filterNewDashboardActions(
-      allActions,
-      (existingNotes ?? []).map((note) => note.content)
-    )
-
-    if (actions.length > 0) {
-      const { error: notesError } = await supabase.from("student_notes").insert(
-        actions.map((action) => ({
-          student_id: user.id,
-          content: action.content,
-          author: action.author,
-          author_id: action.author_id,
-          type: action.type,
-          action_status: action.action_status,
-          priority: action.priority,
-          visible_to_student: action.visible_to_student,
-        }))
-      )
-
-      if (notesError) {
-        console.error("Error syncing to dashboard:", notesError)
-        return { success: false, error: "Failed to sync actions to dashboard" }
-      }
-
-      actionsCreated = actions.length
-    }
+  if (!syncResult.success) {
+    return { success: false, error: syncResult.error }
   }
 
   const { data: completed, error: updateError } = await supabase
@@ -310,7 +373,7 @@ export async function completePlaybook(sessionId: string): Promise<PlaybookResul
   return {
     success: true,
     session: normalizeSession(completed),
-    actionsCreated,
+    actionsCreated: syncResult.actionsCreated,
   }
 }
 

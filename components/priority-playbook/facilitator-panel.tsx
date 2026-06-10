@@ -11,6 +11,7 @@ interface FacilitatorPanelProps {
   quote?: string
   showTimer?: boolean
   timerSeconds?: number
+  afterTitle?: React.ReactNode
 }
 
 export function FacilitatorPanel({
@@ -20,9 +21,10 @@ export function FacilitatorPanel({
   quote,
   showTimer = false,
   timerSeconds = 180,
+  afterTitle,
 }: FacilitatorPanelProps) {
   return (
-    <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white h-full">
+    <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white h-auto self-start">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2 mb-1">
           <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-50">
@@ -31,7 +33,8 @@ export function FacilitatorPanel({
           {showTimer && <WorkshopTimer seconds={timerSeconds} />}
         </div>
         <CardTitle className="text-lg text-slate-800">{title}</CardTitle>
-        <CardDescription className="text-slate-600 text-sm leading-relaxed">
+        {afterTitle}
+        <CardDescription className="text-slate-600 text-sm leading-relaxed mt-2">
           {description}
         </CardDescription>
       </CardHeader>

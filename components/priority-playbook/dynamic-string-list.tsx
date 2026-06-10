@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Trash2 } from "lucide-react"
+import { NO_AUTOCORRECT_PROPS } from "./no-autocorrect"
 
 interface DynamicStringListProps {
   label: string
@@ -43,6 +44,7 @@ export function DynamicStringList({
               onChange={(e) => updateItem(index, e.target.value)}
               placeholder={placeholder}
               className="flex-1"
+              {...NO_AUTOCORRECT_PROPS}
             />
             <Button
               type="button"

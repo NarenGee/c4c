@@ -1,6 +1,8 @@
 "use client"
 
-import type { MatrixItem, QuadrantPriority } from "@/lib/priority-playbook/types"
+import { PlaybookItemCard } from "./playbook-item-card"
+import { enrichMatrixItems } from "@/lib/priority-playbook/item-context"
+import type { MatrixItem, PlaybookGoal, QuadrantPriority } from "@/lib/priority-playbook/types"
 import { cn } from "@/lib/utils"
 
 const QUADRANTS: {
@@ -37,6 +39,7 @@ const QUADRANTS: {
 
 interface EisenhowerMatrixDiagramProps {
   matrix: MatrixItem[]
+  goals?: PlaybookGoal[]
   className?: string
 }
 
@@ -63,12 +66,7 @@ function QuadrantCell({
           <p className="text-xs text-slate-400 italic">No tasks</p>
         ) : (
           items.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-lg border border-white/80 bg-white/90 px-2.5 py-1.5 text-sm text-slate-800 shadow-sm"
-            >
-              {item.text}
-            </div>
+            <PlaybookItemCard key={item.id} item={item} draggable={false} compact />
           ))
         )}
       </div>
@@ -76,12 +74,14 @@ function QuadrantCell({
   )
 }
 
-export function EisenhowerMatrixDiagram({ matrix, className }: EisenhowerMatrixDiagramProps) {
-  const itemsInQuadrant = (quadrant: QuadrantPriority) =>
-    matrix.filter((item) => item.quadrant === quadrant)
+export function EisenhowerMatrixDiagram({ matrix, goals = [], className }: EisenhowerMatrixDiagramProps) {
+  const enrichedMatrix = enrichMatrixItems(matrix, goals)
 
-  const unassigned = matrix.filter((item) => !item.quadrant)
-  const placedCount = matrix.filter((item) => item.quadrant).length
+  const itemsInQuadrant = (quadrant: QuadrantPriority) =>
+    enrichedMatrix.filter((item) => item.quadrant === quadrant)
+
+  const unassigned = enrichedMatrix.filter((item) => !item.quadrant)
+  const placedCount = enrichedMatrix.filter((item) => item.quadrant).length
 
   const q1 = QUADRANTS[0]
   const q2 = QUADRANTS[1]
@@ -90,7 +90,6 @@ export function EisenhowerMatrixDiagram({ matrix, className }: EisenhowerMatrixD
 
   return (
     <div className={cn("w-full space-y-3", className)}>
-      {/* Column headers */}
       <div className="grid grid-cols-[3.5rem_1fr_1fr] sm:grid-cols-[4.5rem_1fr_1fr] gap-2">
         <div />
         <div className="text-center text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -101,7 +100,6 @@ export function EisenhowerMatrixDiagram({ matrix, className }: EisenhowerMatrixD
         </div>
       </div>
 
-      {/* Important row */}
       <div className="grid grid-cols-[3.5rem_1fr_1fr] sm:grid-cols-[4.5rem_1fr_1fr] gap-2">
         <div className="flex items-center justify-center px-1">
           <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-slate-500 text-center leading-snug">
@@ -112,7 +110,6 @@ export function EisenhowerMatrixDiagram({ matrix, className }: EisenhowerMatrixD
         <QuadrantCell quadrant={q2} items={itemsInQuadrant(q2.key)} />
       </div>
 
-      {/* Not important row */}
       <div className="grid grid-cols-[3.5rem_1fr_1fr] sm:grid-cols-[4.5rem_1fr_1fr] gap-2">
         <div className="flex items-center justify-center px-1">
           <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-slate-500 text-center leading-snug">
@@ -128,21 +125,16 @@ export function EisenhowerMatrixDiagram({ matrix, className }: EisenhowerMatrixD
           <p className="text-xs font-medium text-slate-600 mb-2">
             Unassigned ({unassigned.length})
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="space-y-1.5">
             {unassigned.map((item) => (
-              <span
-                key={item.id}
-                className="rounded-lg border bg-white px-2.5 py-1 text-sm text-slate-700"
-              >
-                {item.text}
-              </span>
+              <PlaybookItemCard key={item.id} item={item} draggable={false} compact />
             ))}
           </div>
         </div>
       )}
 
       <p className="text-xs text-slate-500 text-center">
-        {placedCount} of {matrix.length} task{matrix.length === 1 ? "" : "s"} placed
+        {placedCount} of {enrichedMatrix.length} task{enrichedMatrix.length === 1 ? "" : "s"} placed
       </p>
     </div>
   )
