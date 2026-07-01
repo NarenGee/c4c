@@ -136,12 +136,12 @@ export function PriorityPlaybookWizard() {
 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(async () => {
+        const snapshot = sessionRef.current
+        if (!snapshot) return
         setSaving(true)
-        const result = await savePlaybookSession(updated)
+        const result = await savePlaybookSession(snapshot)
         if (!result.success) {
           setError(result.error || "Failed to save")
-        } else if (result.session) {
-          setSession(result.session)
         }
         setSaving(false)
       }, 600)
@@ -162,12 +162,12 @@ export function PriorityPlaybookWizard() {
 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(async () => {
+        const snapshot = sessionRef.current
+        if (!snapshot) return
         setSaving(true)
-        const result = await savePlaybookSession(updated)
+        const result = await savePlaybookSession(snapshot)
         if (!result.success) {
           setError(result.error || "Failed to save")
-        } else if (result.session) {
-          setSession(result.session)
         }
         setSaving(false)
       }, 600)
