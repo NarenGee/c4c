@@ -30,12 +30,19 @@ export interface FutureSelf {
   identityWords: string[]
 }
 
+export interface PlaybookTask {
+  id?: string
+  text: string
+  startDate?: string
+  endDate?: string
+}
+
 export interface PlaybookMilestone {
   id?: string
   title: string
   startDate?: string
   endDate?: string
-  tasks?: string[]
+  tasks?: PlaybookTask[]
   status?: MilestoneStatus
   /** When true, status was set manually and won't be overridden by date-based rules. */
   statusManual?: boolean
@@ -48,12 +55,28 @@ export interface PlaybookGoal {
   firstMilestoneTasks: string[]
 }
 
+export const EMPTY_TASK: PlaybookTask = {
+  text: "",
+  startDate: "",
+  endDate: "",
+}
+
 export const EMPTY_MILESTONE: PlaybookMilestone = {
   title: "",
   startDate: "",
   endDate: "",
-  tasks: [""],
+  tasks: [EMPTY_TASK],
   status: "not_started",
+}
+
+export function createTask(overrides: Partial<PlaybookTask> = {}): PlaybookTask {
+  return {
+    id: crypto.randomUUID(),
+    text: "",
+    startDate: "",
+    endDate: "",
+    ...overrides,
+  }
 }
 
 export function createMilestone(overrides: Partial<PlaybookMilestone> = {}): PlaybookMilestone {
@@ -62,7 +85,7 @@ export function createMilestone(overrides: Partial<PlaybookMilestone> = {}): Pla
     title: "",
     startDate: "",
     endDate: "",
-    tasks: [""],
+    tasks: [createTask()],
     status: "not_started",
     ...overrides,
   }
@@ -78,6 +101,22 @@ export function createEmptyGoal(title = ""): PlaybookGoal {
   }
 }
 
+export function normalizeTask(entry: unknown): PlaybookTask {
+  if (typeof entry === "string") {
+    return createTask({ text: entry })
+  }
+  if (entry && typeof entry === "object") {
+    const raw = entry as PlaybookTask
+    return {
+      id: typeof raw.id === "string" && raw.id ? raw.id : crypto.randomUUID(),
+      text: typeof raw.text === "string" ? raw.text : "",
+      startDate: typeof raw.startDate === "string" ? raw.startDate : "",
+      endDate: typeof raw.endDate === "string" ? raw.endDate : "",
+    }
+  }
+  return createTask()
+}
+
 export function normalizeMilestone(entry: unknown): PlaybookMilestone {
   if (typeof entry === "string") {
     return createMilestone({ title: entry })
@@ -86,14 +125,14 @@ export function normalizeMilestone(entry: unknown): PlaybookMilestone {
     const raw = entry as PlaybookMilestone & { targetDate?: string }
     const legacyEnd = typeof raw.targetDate === "string" ? raw.targetDate : ""
     const tasks = Array.isArray(raw.tasks)
-      ? raw.tasks.map((task) => (typeof task === "string" ? task : ""))
+      ? raw.tasks.map(normalizeTask)
       : undefined
     return {
       id: typeof raw.id === "string" && raw.id ? raw.id : crypto.randomUUID(),
       title: typeof raw.title === "string" ? raw.title : "",
       startDate: typeof raw.startDate === "string" ? raw.startDate : "",
       endDate: typeof raw.endDate === "string" ? raw.endDate : legacyEnd,
-      tasks: tasks && tasks.length > 0 ? tasks : [""],
+      tasks: tasks && tasks.length > 0 ? tasks : [createTask()],
       status: normalizeMilestoneStatus(raw.status),
       statusManual: raw.statusManual === true,
     }
@@ -108,38 +147,37 @@ export function normalizeMilestones(entries: unknown): PlaybookMilestone[] {
   return entries.map(normalizeMilestone)
 }
 
-export function getMilestoneTasks(milestone: PlaybookMilestone): string[] {
+export function getMilestoneTasks(milestone: PlaybookMilestone): PlaybookTask[] {
   if (Array.isArray(milestone.tasks) && milestone.tasks.length > 0) {
-    return milestone.tasks
+    return milestone.tasks.map(normalizeTask)
   }
-  return [""]
+  return [createTask()]
+}
+
+export function goalHasTasks(goal: PlaybookGoal): boolean {
+  return normalizeMilestones(goal.milestones).some((milestone) =>
+    getMilestoneTasks(milestone).some((task) => task.text.trim())
+  )
 }
 
 export function normalizeGoal(goal: PlaybookGoal): PlaybookGoal {
-  const milestones = normalizeMilestones(goal.milestones).map((milestone, index) => {
-    const tasks =
-      index === 0 &&
-      (!milestone.tasks || milestone.tasks.every((task) => !task.trim())) &&
-      goal.firstMilestoneTasks?.some((task) => task.trim())
-        ? goal.firstMilestoneTasks
-        : getMilestoneTasks(milestone)
+  let milestones = normalizeMilestones(goal.milestones).map((milestone) => ({
+    ...milestone,
+    tasks: getMilestoneTasks(milestone),
+  }))
 
-    return {
-      ...milestone,
-      tasks: tasks.length > 0 ? tasks : [""],
+  if (
+    milestones[0] &&
+    !milestones[0].tasks.some((task) => task.text.trim()) &&
+    goal.firstMilestoneTasks?.some((task) => task.trim())
+  ) {
+    milestones[0] = {
+      ...milestones[0],
+      tasks: goal.firstMilestoneTasks.map((text) => createTask({ text })),
     }
-  })
-
-  const firstMilestoneTasks =
-    milestones[0]?.tasks && milestones[0].tasks.length > 0
-      ? milestones[0].tasks
-      : goal.firstMilestoneTasks?.length
-        ? goal.firstMilestoneTasks
-        : [""]
-
-  if (milestones[0]) {
-    milestones[0] = { ...milestones[0], tasks: firstMilestoneTasks }
   }
+
+  const firstMilestoneTasks = milestones[0]?.tasks.map((task) => task.text) ?? [""]
 
   return {
     ...goal,
@@ -341,18 +379,21 @@ export function collectInventoryItems(session: Pick<PriorityPlaybookSession, "go
   const items: PlaybookItem[] = []
 
   for (const goal of session.goals) {
-    goal.firstMilestoneTasks.forEach((task, index) => {
-      const text = task.trim()
-      if (!text) return
-      const milestone = getFirstMilestoneLabel(goal)
-      items.push({
-        id: `${goal.id}-task-${index}`,
-        text,
-        source: "goal",
-        goalTitle: goal.title.trim(),
-        milestoneTitle: milestone,
+    const normalized = normalizeGoal(goal)
+    for (const milestone of normalizeMilestones(normalized.milestones)) {
+      const milestoneLabel = formatMilestoneLabel(milestone)
+      getMilestoneTasks(milestone).forEach((task, index) => {
+        const text = task.text.trim()
+        if (!text) return
+        items.push({
+          id: `${goal.id}-${milestone.id}-task-${index}`,
+          text,
+          source: "goal",
+          goalTitle: goal.title.trim(),
+          milestoneTitle: milestoneLabel,
+        })
       })
-    })
+    }
   }
 
   for (const item of session.other_tasks) {

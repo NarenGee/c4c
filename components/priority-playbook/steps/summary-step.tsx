@@ -1,23 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { CheckCircle, ArrowRight, ChevronLeft, Pencil } from "lucide-react"
-import {
-  formatMilestoneLabel,
-  normalizeMilestones,
-  type PlaybookGoal,
-  type PriorityPlaybookSession,
-} from "@/lib/priority-playbook/types"
-import { EisenhowerMatrixDiagram } from "../eisenhower-matrix-diagram"
+import { CheckCircle, ArrowRight, ChevronLeft, Pencil, Download } from "lucide-react"
+import type { PlaybookGoal, PriorityPlaybookSession } from "@/lib/priority-playbook/types"
+import { PlaybookSummaryDocument } from "../playbook-summary-document"
+import { PlaybookSummaryContent } from "../playbook-summary-content"
 import { PlaybookGanttChart } from "../playbook-gantt-chart"
-import { PlaybookItemSummaryList } from "../playbook-item-summary-list"
+import { downloadPlaybookSummaryPdf } from "@/lib/priority-playbook/download-summary-pdf"
 
 interface SummaryStepProps {
   session: PriorityPlaybookSession
+  studentName: string
   onComplete: () => void
   onSaveEdits?: () => void
   onEditPlaybook?: () => void
@@ -29,148 +24,9 @@ interface SummaryStepProps {
   actionsCreated?: number
 }
 
-function PlaybookSummaryContent({ session }: { session: PriorityPlaybookSession }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Opening Reflection</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-slate-600 space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium">2–3 year vision:</span>
-            <Badge variant="outline" className="capitalize">
-              {session.reflection.visionClarity.rating || "—"}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium">Has a plan:</span>
-            <Badge variant="outline" className="capitalize">
-              {session.reflection.planExists.rating || "—"}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium">Executing satisfactorily:</span>
-            <Badge variant="outline" className="capitalize">
-              {session.reflection.executingSatisfactorily.rating || "—"}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Focus Areas</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-1">
-          {session.focus_areas.filter(Boolean).map((area) => (
-            <Badge key={area} variant="secondary">{area}</Badge>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Future Self</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-slate-600 space-y-2">
-          <p>{session.future_self.narrative || "—"}</p>
-          <div>
-            <span className="font-medium">Accomplishments: </span>
-            {session.future_self.accomplishments.filter(Boolean).join(", ") || "—"}
-          </div>
-          <div>
-            <span className="font-medium">Identity: </span>
-            {session.future_self.identityWords.filter(Boolean).join(", ") || "—"}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Goals & Milestones</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-slate-600 space-y-3">
-          {session.goals.map((goal) => (
-            <div key={goal.id}>
-              <p className="font-medium text-blue-800">{goal.title}</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Milestones:{" "}
-                {normalizeMilestones(goal.milestones)
-                  .map(formatMilestoneLabel)
-                  .filter(Boolean)
-                  .join(", ") || "—"}
-              </p>
-              <p className="text-xs text-slate-500">
-                First milestone tasks: {goal.firstMilestoneTasks.filter(Boolean).join(", ") || "—"}
-              </p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Big Rocks ({session.rock_sort.big_rocks.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PlaybookItemSummaryList
-            items={session.rock_sort.big_rocks}
-            goals={session.goals}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Gravel ({session.rock_sort.gravel.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PlaybookItemSummaryList
-            items={session.rock_sort.gravel}
-            goals={session.goals}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Sand ({session.rock_sort.sand.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PlaybookItemSummaryList
-            items={session.rock_sort.sand}
-            goals={session.goals}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="md:col-span-2">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Eisenhower Matrix</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EisenhowerMatrixDiagram matrix={session.matrix} goals={session.goals} />
-        </CardContent>
-      </Card>
-
-      <Card className="md:col-span-2">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Matrix Reflection</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-slate-600 space-y-2">
-          <p><span className="font-medium">Thoughts: </span>{session.matrix_reflection.thoughts || "—"}</p>
-          <p><span className="font-medium">Feelings: </span>{session.matrix_reflection.feelings || "—"}</p>
-          <p><span className="font-medium">Where to improve: </span>{session.matrix_reflection.improve || "—"}</p>
-          <p><span className="font-medium">Steps to take now: </span>{session.matrix_reflection.stepsNow || "—"}</p>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
 export function SummaryStep({
   session,
+  studentName,
   onComplete,
   onSaveEdits,
   onEditPlaybook,
@@ -182,6 +38,58 @@ export function SummaryStep({
   actionsCreated = 0,
 }: SummaryStepProps) {
   const [showFullSummary, setShowFullSummary] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const pdfCaptureRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!exportingPdf) return
+
+    let cancelled = false
+
+    ;(async () => {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        if (pdfCaptureRef.current) break
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+
+      if (cancelled || !pdfCaptureRef.current) {
+        setPdfError("Could not prepare the PDF. Please try again.")
+        setExportingPdf(false)
+        setDownloadingPdf(false)
+        return
+      }
+
+      try {
+        await downloadPlaybookSummaryPdf({
+          element: pdfCaptureRef.current,
+          studentName,
+          sessionNumber: session.session_number,
+        })
+      } catch (error) {
+        console.error("Failed to generate playbook summary PDF:", error)
+        if (!cancelled) {
+          setPdfError("Could not generate the PDF. Please try again.")
+        }
+      } finally {
+        if (!cancelled) {
+          setExportingPdf(false)
+          setDownloadingPdf(false)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [exportingPdf, studentName, session.session_number])
+
+  const handleDownloadPdf = () => {
+    setPdfError(null)
+    setDownloadingPdf(true)
+    setExportingPdf(true)
+  }
 
   if (isEditing) {
     return (
@@ -222,10 +130,7 @@ export function SummaryStep({
           </p>
         </div>
 
-        <PlaybookGanttChart
-          goals={session.goals}
-          onChange={onGoalsChange}
-        />
+        <PlaybookGanttChart goals={session.goals} onChange={onGoalsChange} />
 
         <div className="flex flex-wrap justify-center gap-3">
           <Link href="/dashboard">
@@ -249,40 +154,74 @@ export function SummaryStep({
 
   if (completed && showFullSummary) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">Your Priority Playbook Summary</h2>
-            <p className="text-slate-600 text-sm mt-1">
-              Review your completed playbook or edit it to update tasks and priorities.
-            </p>
+      <>
+        {exportingPdf && (
+          <div className="fixed inset-0 z-[999999] overflow-auto bg-white">
+            <div className="px-6 py-8">
+              <div
+                ref={pdfCaptureRef}
+                className="mx-auto w-full max-w-5xl min-w-[1024px]"
+              >
+                <PlaybookSummaryDocument
+                  session={session}
+                  studentName={studentName}
+                  captureMode
+                />
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 self-start">
-            {onEditPlaybook && (
-              <Button variant="outline" size="sm" onClick={onEditPlaybook} className="gap-1">
-                <Pencil className="h-3.5 w-3.5" />
-                Edit Playbook
+        )}
+
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">Your Priority Playbook Summary</h2>
+              <p className="text-slate-600 text-sm mt-1">
+                Review your completed playbook or edit it to update tasks and priorities.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 self-start">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+                className="gap-1"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {downloadingPdf ? "Generating PDF..." : "Download PDF"}
               </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={() => setShowFullSummary(false)} className="gap-1">
-              <ChevronLeft className="h-4 w-4" />
-              Back
-            </Button>
+              {onEditPlaybook && (
+                <Button variant="outline" size="sm" onClick={onEditPlaybook} className="gap-1">
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit Playbook
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setShowFullSummary(false)} className="gap-1">
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </Button>
+            </div>
+          </div>
+
+          {pdfError && <p className="text-sm text-red-600">{pdfError}</p>}
+
+          {!exportingPdf && (
+            <div className="space-y-6">
+              <PlaybookGanttChart goals={session.goals} onChange={onGoalsChange} />
+              <PlaybookSummaryContent session={session} />
+            </div>
+          )}
+
+          <div className="flex justify-center pt-2">
+            <Link href="/dashboard">
+              <Button className="gap-2">
+                Go to Dashboard <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
-        <PlaybookGanttChart
-          goals={session.goals}
-          onChange={onGoalsChange}
-        />
-        <PlaybookSummaryContent session={session} />
-        <div className="flex justify-center pt-2">
-          <Link href="/dashboard">
-            <Button className="gap-2">
-              Go to Dashboard <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-      </div>
+      </>
     )
   }
 

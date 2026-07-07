@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { normalizeMilestoneDateRange } from "@/lib/priority-playbook/milestone-dates"
 import {
-  EMPTY_MILESTONE,
+  createMilestone,
+  getMilestoneTasks,
   type PlaybookMilestone,
 } from "@/lib/priority-playbook/types"
 import { Plus, Trash2 } from "lucide-react"
 import { MilestoneDatePicker } from "./milestone-date-picker"
+import { MilestoneTaskList } from "./milestone-task-list"
 import { NO_AUTOCORRECT_PROPS } from "./no-autocorrect"
 
 interface MilestoneListProps {
@@ -34,7 +36,7 @@ export function MilestoneList({
     onChange(next)
   }
 
-  const addItem = () => onChange([...values, { ...EMPTY_MILESTONE }])
+  const addItem = () => onChange([...values, createMilestone()])
 
   const removeItem = (index: number) => {
     if (values.length <= minItems) return
@@ -83,6 +85,11 @@ export function MilestoneList({
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
+            <MilestoneTaskList
+              label="Tasks for this milestone"
+              values={getMilestoneTasks(milestone)}
+              onChange={(tasks) => updateItem(index, { tasks })}
+            />
           </div>
         ))}
       </div>

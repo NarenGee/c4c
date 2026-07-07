@@ -1,5 +1,5 @@
 import type { PriorityPlaybookSession } from "./types"
-import { collectInventoryItems, collectRockSortItems, normalizeMilestones } from "./types"
+import { collectInventoryItems, collectRockSortItems, goalHasTasks, normalizeMilestones } from "./types"
 
 export function getStepBlockers(session: PriorityPlaybookSession, step: number): string[] {
   const blockers: string[] = []
@@ -41,8 +41,8 @@ export function getStepBlockers(session: PriorityPlaybookSession, step: number):
         if (!normalizeMilestones(goal.milestones).some((m) => m.title.trim())) {
           blockers.push(`Add milestones for "${goal.title || "each goal"}".`)
         }
-        if (!goal.firstMilestoneTasks.some((t) => t.trim())) {
-          blockers.push(`Add first-milestone tasks for "${goal.title || "each goal"}".`)
+        if (!goalHasTasks(goal)) {
+          blockers.push(`Add tasks for "${goal.title || "each goal"}".`)
         }
       }
       break
@@ -106,7 +106,7 @@ export function isStepValid(session: PriorityPlaybookSession, step: number): boo
           (goal) =>
             goal.title.trim().length > 0 &&
             normalizeMilestones(goal.milestones).some((m) => m.title.trim().length > 0) &&
-            goal.firstMilestoneTasks.some((t) => t.trim().length > 0)
+            goalHasTasks(goal)
         )
       )
     case 6:

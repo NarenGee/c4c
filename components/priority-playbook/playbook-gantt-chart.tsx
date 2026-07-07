@@ -23,13 +23,21 @@ import {
 import { CheckCircle2, Plus, Trash2, ListTodo } from "lucide-react"
 import {
   assignBarLanes,
+  assignTaskBarLanes,
   buildMilestoneBars,
+  buildTaskBars,
+  computeGoalRowLayout,
   computeTimelineRange,
   formatBarDateRange,
   formatTimelineMonth,
   getTimelineMonthSpans,
   getTimelineWidthPx,
   GOAL_COLUMN_MIN_WIDTH_PX,
+  MILESTONE_BAR_HEIGHT_PX,
+  MILESTONE_TASK_GAP_PX,
+  TASK_BAR_HEIGHT_PX,
+  TASK_LANE_HEIGHT_PX,
+  getGoalSwimlaneColor,
 } from "@/lib/priority-playbook/gantt"
 import {
   computeAutoMilestoneStatus,
@@ -43,15 +51,16 @@ import {
 import {
   createEmptyGoal,
   createMilestone,
+  getMilestoneTasks,
   normalizeGoal,
   normalizeMilestones,
   type PlaybookGoal,
   type PlaybookMilestone,
 } from "@/lib/priority-playbook/types"
-import { DynamicStringList } from "./dynamic-string-list"
+import { MilestoneTaskList } from "./milestone-task-list"
 import { MilestoneDatePicker } from "./milestone-date-picker"
 import { NO_AUTOCORRECT_PROPS } from "./no-autocorrect"
-import { normalizeMilestoneDateRange } from "@/lib/priority-playbook/milestone-dates"
+import { normalizeMilestoneDateRange, formatMilestoneRangeLabel } from "@/lib/priority-playbook/milestone-dates"
 import { cn } from "@/lib/utils"
 
 interface PlaybookGanttChartProps {
@@ -83,6 +92,13 @@ export function PlaybookGanttChart({
   const bars = useMemo(
     () => assignBarLanes(buildMilestoneBars(normalizedGoals, range)),
     [normalizedGoals, range]
+  )
+  const selectedTaskBars = useMemo(
+    () =>
+      selected?.milestoneId
+        ? assignTaskBarLanes(buildTaskBars(normalizedGoals, range, selected.milestoneId))
+        : [],
+    [normalizedGoals, range, selected?.milestoneId]
   )
 
   const selectedGoal = selected
@@ -185,7 +201,8 @@ export function PlaybookGanttChart({
           <div>
             <CardTitle className="text-lg">Goal Timeline</CardTitle>
             <CardDescription>
-              Milestones grouped by goal. Click a milestone to view and manage its tasks.
+              Milestones grouped by goal. Click a milestone to reveal its tasks on the timeline and
+              open details.
             </CardDescription>
           </div>
           {editable && (
@@ -209,7 +226,7 @@ export function PlaybookGanttChart({
             )}
           </div>
         ) : (
-          <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <div className="rounded-xl border border-slate-200">
             <ScrollArea className="w-full">
               <div
                 className="min-w-full"
@@ -237,11 +254,17 @@ export function PlaybookGanttChart({
                   </div>
                 </div>
 
-                {normalizedGoals.map((goal) => {
+                {normalizedGoals.map((goal, goalIndex) => {
                   const goalComplete = isGoalComplete(goal)
                   const goalBars = barsByGoal.get(goal.id) ?? []
-                  const laneCount = goalBars.reduce((maxLanes, bar) => Math.max(maxLanes, bar.laneCount), 1)
-                  const rowHeightPx = Math.max(56, laneCount * 36 + 16)
+                  const selectedBarInGoal =
+                    selected?.goalId === goal.id
+                      ? goalBars.find((bar) => bar.milestoneId === selected.milestoneId)
+                      : undefined
+                  const taskBarsInGoal =
+                    selectedBarInGoal && selectedTaskBars.length > 0 ? selectedTaskBars : []
+                  const rowLayout = computeGoalRowLayout(goalBars, selectedBarInGoal, taskBarsInGoal)
+                  const goalColor = getGoalSwimlaneColor(goalIndex)
 
                   return (
                     <div
@@ -251,9 +274,10 @@ export function PlaybookGanttChart({
                     >
                       <div
                         className={cn(
-                          "px-4 py-3 border-r border-slate-100 bg-white",
+                          "px-4 py-3 border-r border-slate-100 bg-white flex flex-col justify-center",
                           goalComplete && "bg-green-50/60"
                         )}
+                        style={{ minHeight: `${rowLayout.rowHeightPx}px` }}
                       >
                         {editable ? (
                           <div className="space-y-2">
@@ -312,8 +336,11 @@ export function PlaybookGanttChart({
                       </div>
 
                       <div
-                        className="relative overflow-hidden bg-slate-50/50 border-l border-slate-100"
-                        style={{ height: `${rowHeightPx}px` }}
+                        className={cn(
+                          "relative bg-slate-50/50 border-l border-slate-100 transition-[height] duration-200 ease-out",
+                          rowLayout.isExpanded ? "overflow-visible z-10" : "overflow-hidden"
+                        )}
+                        style={{ height: `${rowLayout.rowHeightPx}px` }}
                       >
                         <div className="absolute inset-0 flex pointer-events-none">
                           {monthSpans.map(({ month, widthPercent }) => (
@@ -337,23 +364,24 @@ export function PlaybookGanttChart({
                               selected?.goalId === bar.goalId &&
                               selected?.milestoneId === bar.milestoneId
                             const statusOption = getMilestoneStatusOption(bar.status)
-                            const barHeightPx = 28
-                            const laneHeight = rowHeightPx / bar.laneCount
-                            const topPx = Math.max(
-                              4,
-                              bar.lane * laneHeight + Math.max(0, (laneHeight - barHeightPx) / 2)
-                            )
+                            const topPx = rowLayout.getMilestoneTopPx(bar)
 
                             return (
                               <button
                                 key={bar.milestoneId}
                                 type="button"
-                                onClick={() =>
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelected(null)
+                                    return
+                                  }
                                   setSelected({ goalId: bar.goalId, milestoneId: bar.milestoneId })
-                                }
+                                }}
                                 className={cn(
-                                  "absolute z-10 h-7 rounded-md px-2 text-left text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90",
-                                  !bar.hasExplicitDates && "outline outline-1 outline-white/40 outline-offset-[-1px]"
+                                  "absolute rounded-md px-2 text-left text-xs font-medium text-white shadow-sm transition-all duration-200 hover:opacity-90",
+                                  isSelected ? "z-30" : "z-10",
+                                  !bar.hasExplicitDates &&
+                                    "outline outline-1 outline-white/40 outline-offset-[-1px]"
                                 )}
                                 style={{
                                   left: `${bar.leftPercent}%`,
@@ -361,6 +389,7 @@ export function PlaybookGanttChart({
                                   minWidth: "4.5rem",
                                   maxWidth: `calc(100% - ${bar.leftPercent}%)`,
                                   top: `${topPx}px`,
+                                  height: `${MILESTONE_BAR_HEIGHT_PX}px`,
                                   backgroundColor: statusOption.color,
                                   boxShadow: isSelected
                                     ? `0 0 0 2px white, 0 0 0 4px ${statusOption.ring}`
@@ -368,11 +397,59 @@ export function PlaybookGanttChart({
                                 }}
                                 title={`${bar.title} (${statusOption.label})`}
                               >
-                                <span className="block truncate">{bar.title}</span>
+                                <span className="block truncate leading-7">{bar.title}</span>
                               </button>
                             )
                           })
                         )}
+
+                        {selectedBarInGoal && taskBarsInGoal.length > 0 && (
+                          <div
+                            className="absolute left-0 right-0 z-[15] border-t border-dashed border-slate-300 pointer-events-none"
+                            style={{
+                              top: `${rowLayout.selectedMilestoneTopPx + MILESTONE_BAR_HEIGHT_PX + MILESTONE_TASK_GAP_PX / 2}px`,
+                            }}
+                          />
+                        )}
+
+                        {taskBarsInGoal.map((taskBar) => {
+                          const taskTopPx =
+                            rowLayout.selectedMilestoneTopPx +
+                            MILESTONE_BAR_HEIGHT_PX +
+                            MILESTONE_TASK_GAP_PX +
+                            taskBar.lane * TASK_LANE_HEIGHT_PX
+
+                          return (
+                            <button
+                              key={taskBar.taskId}
+                              type="button"
+                              onClick={() =>
+                                setSelected({
+                                  goalId: taskBar.goalId,
+                                  milestoneId: taskBar.milestoneId,
+                                })
+                              }
+                              className={cn(
+                                "absolute z-20 rounded px-2 text-left text-[11px] font-medium shadow-sm transition-opacity hover:opacity-90 border",
+                                !taskBar.hasExplicitDates ? "border-dashed" : "border-solid"
+                              )}
+                              style={{
+                                left: `${taskBar.leftPercent}%`,
+                                width: `${taskBar.widthPercent}%`,
+                                minWidth: "3.5rem",
+                                maxWidth: `calc(100% - ${taskBar.leftPercent}%)`,
+                                top: `${taskTopPx}px`,
+                                height: `${TASK_BAR_HEIGHT_PX}px`,
+                                backgroundColor: `${goalColor.bar}40`,
+                                borderColor: goalColor.bar,
+                                color: goalColor.label,
+                              }}
+                              title={taskBar.title}
+                            >
+                              <span className="block truncate leading-5">{taskBar.title}</span>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   )
@@ -404,12 +481,13 @@ export function PlaybookGanttChart({
       </CardContent>
 
       <Sheet
+        modal={false}
         open={!!selectedMilestone}
         onOpenChange={(open) => {
           if (!open) setSelected(null)
         }}
       >
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent side="right" overlay={false} className="w-full sm:max-w-md overflow-y-auto shadow-xl border-l">
           {selectedMilestone && selectedGoal && (
             <>
               <SheetHeader>
@@ -519,10 +597,9 @@ export function PlaybookGanttChart({
                       </div>
                     </div>
 
-                    <DynamicStringList
+                    <MilestoneTaskList
                       label="Tasks for this milestone"
-                      placeholder="A task to complete..."
-                      values={selectedMilestone.tasks ?? [""]}
+                      values={getMilestoneTasks(selectedMilestone)}
                       onChange={(tasks) =>
                         updateMilestone(selectedGoal.id, selectedMilestone.id!, { tasks })
                       }
@@ -588,15 +665,23 @@ export function PlaybookGanttChart({
                         Tasks
                       </div>
                       <ul className="space-y-1">
-                        {(selectedMilestone.tasks ?? []).filter(Boolean).map((task, index) => (
-                          <li
-                            key={index}
-                            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                          >
-                            {task}
-                          </li>
-                        ))}
-                        {(selectedMilestone.tasks ?? []).filter(Boolean).length === 0 && (
+                        {getMilestoneTasks(selectedMilestone)
+                          .filter((task) => task.text.trim())
+                          .map((task) => {
+                            const dateLabel = formatMilestoneRangeLabel(task.startDate, task.endDate)
+                            return (
+                              <li
+                                key={task.id}
+                                className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                              >
+                                <span>{task.text}</span>
+                                {dateLabel && (
+                                  <span className="block text-xs text-slate-500 mt-0.5">{dateLabel}</span>
+                                )}
+                              </li>
+                            )
+                          })}
+                        {getMilestoneTasks(selectedMilestone).filter((task) => task.text.trim()).length === 0 && (
                           <li className="text-sm text-slate-400">No tasks for this milestone.</li>
                         )}
                       </ul>

@@ -49,7 +49,7 @@ import { EisenhowerMatrixStep } from "./steps/eisenhower-matrix-step"
 import { MatrixReflectionStep } from "./steps/matrix-reflection-step"
 import { SummaryStep } from "./steps/summary-step"
 
-export function PriorityPlaybookWizard() {
+export function PriorityPlaybookWizard({ studentName }: { studentName: string }) {
   const [session, setSession] = useState<PriorityPlaybookSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -500,6 +500,7 @@ export function PriorityPlaybookWizard() {
         {currentStep === 10 && (
           <SummaryStep
             session={session}
+            studentName={studentName}
             onComplete={handleComplete}
             onSaveEdits={handleSaveEdits}
             onEditPlaybook={handleStartEdit}

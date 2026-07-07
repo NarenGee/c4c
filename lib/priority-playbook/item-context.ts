@@ -1,5 +1,5 @@
 import type { MatrixItem, PlaybookGoal, PlaybookItem } from "./types"
-import { getFirstMilestoneLabel } from "./types"
+import { formatMilestoneLabel, getMilestoneTasks, normalizeMilestones } from "./types"
 
 export type PlaybookItemContext = Pick<
   PlaybookItem,
@@ -25,15 +25,20 @@ export function enrichPlaybookItem(item: PlaybookItem, goals: PlaybookGoal[]): P
   }
 
   for (const goal of goals) {
-    for (let index = 0; index < goal.firstMilestoneTasks.length; index++) {
-      if (`${goal.id}-task-${index}` !== item.id) continue
+    for (const milestone of normalizeMilestones(goal.milestones)) {
+      const tasks = getMilestoneTasks(milestone)
+      for (let index = 0; index < tasks.length; index++) {
+        const milestoneId = milestone.id ?? "milestone"
+        const newId = `${goal.id}-${milestoneId}-task-${index}`
+        const legacyId = `${goal.id}-task-${index}`
+        if (item.id !== newId && item.id !== legacyId) continue
 
-      const milestone = getFirstMilestoneLabel(goal)
-      return {
-        ...item,
-        source: "goal",
-        goalTitle: goal.title.trim(),
-        milestoneTitle: milestone,
+        return {
+          ...item,
+          source: "goal",
+          goalTitle: goal.title.trim(),
+          milestoneTitle: formatMilestoneLabel(milestone),
+        }
       }
     }
   }

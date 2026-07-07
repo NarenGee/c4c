@@ -6,6 +6,7 @@ import {
   type PriorityPlaybookSession,
   normalizeSession,
   createEmptySession,
+  createEmptyGoal,
   createMilestone,
   collectInventoryItems,
   persistPlaybookSession,
@@ -296,12 +297,7 @@ export async function prepareStepData(
     updated.goals = updated.future_self.accomplishments
       .map((title) => title.trim())
       .filter(Boolean)
-      .map((title) => ({
-        id: crypto.randomUUID(),
-        title,
-        milestones: [createMilestone()],
-        firstMilestoneTasks: [""],
-      }))
+      .map((title) => createEmptyGoal(title))
   }
 
   if (step === 7) {

@@ -7,7 +7,8 @@ import { PlaybookGanttChart } from "./playbook-gantt-chart"
 import { PlaybookItemSummaryList } from "./playbook-item-summary-list"
 import { enrichMatrixItem, getItemContextLabel } from "@/lib/priority-playbook/item-context"
 import type { MatrixItem, PlaybookItem, PriorityPlaybookSession } from "@/lib/priority-playbook/types"
-import { formatMilestoneLabel, normalizeMilestones } from "@/lib/priority-playbook/types"
+import { formatMilestoneLabel, getMilestoneTasks, normalizeMilestones } from "@/lib/priority-playbook/types"
+import { formatMilestoneRangeLabel } from "@/lib/priority-playbook/milestone-dates"
 
 interface CoachPlaybookViewProps {
   session: PriorityPlaybookSession
@@ -74,16 +75,34 @@ export function CoachPlaybookView({ session, studentName }: CoachPlaybookViewPro
         {session.goals.map((goal) => (
           <div key={goal.id} className="mb-3 last:mb-0">
             <p className="font-medium text-sm text-blue-800">{goal.title}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Milestones:{" "}
-              {normalizeMilestones(goal.milestones)
-                .map(formatMilestoneLabel)
-                .filter(Boolean)
-                .join(", ")}
-            </p>
-            <p className="text-xs text-slate-500">
-              First milestone tasks: {goal.firstMilestoneTasks.filter(Boolean).join(", ")}
-            </p>
+            <div className="mt-2 space-y-2">
+              {normalizeMilestones(goal.milestones).map((milestone) => {
+                const tasks = getMilestoneTasks(milestone).filter((task) => task.text.trim())
+                if (!milestone.title.trim() && tasks.length === 0) return null
+                return (
+                  <div key={milestone.id}>
+                    <p className="text-xs font-medium text-slate-600">
+                      {formatMilestoneLabel(milestone) || "Milestone"}
+                    </p>
+                    {tasks.length > 0 ? (
+                      <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
+                        {tasks.map((task) => {
+                          const dateLabel = formatMilestoneRangeLabel(task.startDate, task.endDate)
+                          return (
+                            <li key={task.id}>
+                              {task.text}
+                              {dateLabel ? ` (${dateLabel})` : ""}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-slate-400 mt-0.5">No tasks</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         ))}
       </Section>

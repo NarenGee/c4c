@@ -23,7 +23,7 @@ export default async function PriorityPlaybookPage() {
       <DashboardHeader user={user} />
       <StudentAISidebarShell enabled>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-12">
-          <PriorityPlaybookWizard />
+          <PriorityPlaybookWizard studentName={user.full_name} />
         </div>
       </StudentAISidebarShell>
     </div>

@@ -14,13 +14,233 @@ import {
 import { parseMilestoneDate, toMilestoneDateString } from "./milestone-dates"
 import { getEffectiveMilestoneStatus } from "./milestone-status"
 import type { MilestoneStatus } from "./milestone-status"
-import type { PlaybookGoal, PlaybookMilestone } from "./types"
-import { normalizeGoal, normalizeMilestones } from "./types"
+import type { PlaybookGoal, PlaybookMilestone, PlaybookTask } from "./types"
+import { getMilestoneTasks, normalizeGoal, normalizeMilestones } from "./types"
 
 export interface TimelineRange {
   start: Date
   end: Date
   totalDays: number
+}
+
+export interface TaskBar {
+  goalId: string
+  milestoneId: string
+  taskId: string
+  title: string
+  start: Date
+  end: Date
+  leftPercent: number
+  widthPercent: number
+  hasExplicitDates: boolean
+}
+
+export interface TaskBarWithLane extends TaskBar {
+  lane: number
+  laneCount: number
+}
+
+function hasExplicitTaskDates(task: PlaybookTask): boolean {
+  return Boolean(task.startDate?.trim() || task.endDate?.trim())
+}
+
+export function getTaskDisplayDates(
+  task: PlaybookTask,
+  taskIndex: number,
+  taskCount: number,
+  milestoneStart: Date,
+  milestoneEnd: Date
+): { start: Date; end: Date; hasExplicitDates: boolean } {
+  const start = parseMilestoneDate(task.startDate)
+  const end = parseMilestoneDate(task.endDate)
+
+  if (start && end) {
+    return {
+      start: start <= end ? start : end,
+      end: end >= start ? end : start,
+      hasExplicitDates: true,
+    }
+  }
+
+  if (start) {
+    const taskEnd = end ?? addDays(start, 6)
+    return {
+      start,
+      end: taskEnd > start ? taskEnd : addDays(start, 1),
+      hasExplicitDates: true,
+    }
+  }
+
+  if (end) {
+    const taskStart = start ?? addDays(end, -6)
+    return {
+      start: taskStart < end ? taskStart : addDays(end, -1),
+      end,
+      hasExplicitDates: true,
+    }
+  }
+
+  const orderedStart = milestoneStart <= milestoneEnd ? milestoneStart : milestoneEnd
+  const orderedEnd = milestoneEnd >= milestoneStart ? milestoneEnd : milestoneStart
+  const spanDays = Math.max(differenceInCalendarDays(orderedEnd, orderedStart), 1)
+  const slots = Math.max(taskCount, 1)
+  const slotDays = Math.max(Math.floor(spanDays / slots), 2)
+  const offsetDays = Math.min(taskIndex * slotDays, Math.max(spanDays - slotDays, 0))
+  const taskStart = addDays(orderedStart, offsetDays)
+  const taskEnd = min([addDays(taskStart, Math.max(slotDays - 1, 1)), orderedEnd])
+
+  return {
+    start: taskStart,
+    end: taskEnd >= taskStart ? taskEnd : taskStart,
+    hasExplicitDates: false,
+  }
+}
+
+export function buildTaskBars(
+  goals: PlaybookGoal[],
+  range: TimelineRange,
+  milestoneId?: string
+): TaskBar[] {
+  if (!milestoneId) return []
+
+  const bars: TaskBar[] = []
+  const today = startOfToday()
+
+  goals.forEach((goal, goalIndex) => {
+    const normalized = normalizeGoal(goal)
+    const milestones = normalizeMilestones(normalized.milestones).filter((m) => m.title.trim())
+    const goalFallbackStart = addWeeks(today, goalIndex * 2)
+
+    milestones.forEach((milestone, index) => {
+      if (milestone.id !== milestoneId) return
+
+      const milestoneDates = getMilestoneDisplayDates(milestone, index, goalFallbackStart)
+      const tasks = getMilestoneTasks(milestone).filter((task) => task.text.trim())
+      const taskCount = tasks.length
+
+      tasks.forEach((task, taskIndex) => {
+        const { start, end, hasExplicitDates } = getTaskDisplayDates(
+          task,
+          taskIndex,
+          taskCount,
+          milestoneDates.start,
+          milestoneDates.end
+        )
+        const leftPercent = dateToTimelinePercent(start, range)
+        const rightPercent = dateToTimelinePercent(end, range)
+
+        bars.push({
+          goalId: normalized.id,
+          milestoneId: milestone.id!,
+          taskId: task.id!,
+          title: task.text.trim(),
+          start,
+          end,
+          leftPercent,
+          widthPercent: Math.max(rightPercent - leftPercent, 2.5),
+          hasExplicitDates,
+        })
+      })
+    })
+  })
+
+  return bars
+}
+
+/** Assign vertical lanes when task bars overlap within the same milestone. */
+export function assignTaskBarLanes(bars: TaskBar[]): TaskBarWithLane[] {
+  if (bars.length === 0) return []
+
+  const sorted = [...bars].sort((a, b) => a.leftPercent - b.leftPercent)
+  const laneEnds: number[] = []
+  const laneByTask = new Map<string, number>()
+
+  for (const bar of sorted) {
+    const start = bar.leftPercent
+    const end = bar.leftPercent + bar.widthPercent
+    let lane = laneEnds.findIndex((laneEnd) => laneEnd <= start + 0.5)
+
+    if (lane === -1) {
+      lane = laneEnds.length
+      laneEnds.push(end)
+    } else {
+      laneEnds[lane] = end
+    }
+
+    laneByTask.set(bar.taskId, lane)
+  }
+
+  const laneCount = Math.max(laneEnds.length, 1)
+  return bars.map((bar) => ({
+    ...bar,
+    lane: laneByTask.get(bar.taskId) ?? 0,
+    laneCount,
+  }))
+}
+
+export const MILESTONE_BAR_HEIGHT_PX = 28
+export const TASK_BAR_HEIGHT_PX = 22
+export const TASK_LANE_HEIGHT_PX = 26
+export const MILESTONE_TASK_GAP_PX = 8
+export const MILESTONE_LANE_HEIGHT_PX = 36
+export const MILESTONE_ZONE_PADDING_PX = 16
+export const MILESTONE_ZONE_MIN_HEIGHT_PX = 56
+
+export interface GoalRowLayout {
+  milestoneZoneHeight: number
+  taskZoneHeight: number
+  rowHeightPx: number
+  selectedMilestoneTopPx: number
+  isExpanded: boolean
+  getMilestoneTopPx: (bar: MilestoneBarWithLane) => number
+}
+
+function getBaseMilestoneTopPx(bar: MilestoneBarWithLane, milestoneZoneHeight: number): number {
+  const laneHeight = milestoneZoneHeight / bar.laneCount
+  return Math.max(
+    4,
+    bar.lane * laneHeight + Math.max(0, (laneHeight - MILESTONE_BAR_HEIGHT_PX) / 2)
+  )
+}
+
+/** Lay out milestone + task bars when a milestone is expanded. */
+export function computeGoalRowLayout(
+  goalBars: MilestoneBarWithLane[],
+  selectedBar: MilestoneBarWithLane | undefined,
+  taskBars: TaskBarWithLane[]
+): GoalRowLayout {
+  const laneCount = goalBars.reduce((max, bar) => Math.max(max, bar.laneCount), 1)
+  const milestoneZoneHeight = Math.max(
+    MILESTONE_ZONE_MIN_HEIGHT_PX,
+    laneCount * MILESTONE_LANE_HEIGHT_PX + MILESTONE_ZONE_PADDING_PX
+  )
+
+  const taskLaneCount = taskBars.reduce((max, bar) => Math.max(max, bar.laneCount), 1)
+  const taskZoneHeight =
+    selectedBar && taskBars.length > 0
+      ? MILESTONE_TASK_GAP_PX + taskLaneCount * TASK_LANE_HEIGHT_PX + 8
+      : 0
+  const isExpanded = taskZoneHeight > 0 && !!selectedBar
+
+  const getMilestoneTopPx = (bar: MilestoneBarWithLane) => {
+    let topPx = getBaseMilestoneTopPx(bar, milestoneZoneHeight)
+    if (isExpanded && selectedBar && bar.lane > selectedBar.lane) {
+      topPx += taskZoneHeight
+    }
+    return topPx
+  }
+
+  const selectedMilestoneTopPx = selectedBar ? getMilestoneTopPx(selectedBar) : 0
+  const rowHeightPx = isExpanded ? milestoneZoneHeight + taskZoneHeight : milestoneZoneHeight
+
+  return {
+    milestoneZoneHeight,
+    taskZoneHeight,
+    rowHeightPx,
+    selectedMilestoneTopPx,
+    isExpanded,
+    getMilestoneTopPx,
+  }
 }
 
 export interface MilestoneBar {
@@ -102,6 +322,23 @@ export function computeTimelineRange(goals: PlaybookGoal[]): TimelineRange {
         if (!foundDates || end > maxDate) maxDate = end
         foundDates = true
       }
+
+      const milestoneDates = getMilestoneDisplayDates(milestone, index, today)
+      const tasks = getMilestoneTasks(milestone).filter((task) => task.text.trim())
+      tasks.forEach((task, taskIndex) => {
+        const { start: taskStart, end: taskEnd } = getTaskDisplayDates(
+          task,
+          taskIndex,
+          tasks.length,
+          milestoneDates.start,
+          milestoneDates.end
+        )
+        if (hasExplicitTaskDates(task) || task.text.trim()) {
+          if (!foundDates || taskStart < minDate) minDate = taskStart
+          if (!foundDates || taskEnd > maxDate) maxDate = taskEnd
+          foundDates = true
+        }
+      })
     })
   }
 
